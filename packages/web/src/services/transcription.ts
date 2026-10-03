@@ -80,19 +80,26 @@ export class TranscriptionService {
    * Find optimal string and fret for a given frequency.
    */
   static freqToGuitarFret(freq: number): { string: number; fret: number; noteName: string } {
-    const noteInfo = this.freqToNote(freq) || { noteName: 'E4', midi: 64, octave: 4 };
-    let bestString = 1;
+    const noteInfo = this.freqToNote(freq) || { noteName: 'D4', midi: 62, octave: 4 };
+    let bestString = 2;
     let bestFret = 0;
-    let minFret = 99;
+    let lowestPenalty = Infinity;
 
-    // Check across strings from 1 (High E) to 6 (Low E)
+    // String priority weights: favor strings 2, 3, 4 for natural lead fingering
+    const stringWeights: Record<number, number> = { 1: 0.8, 2: 0.0, 3: 0.0, 4: 0.4, 5: 1.5, 6: 2.5 };
+
     for (const s of STRING_BASE_FREQS) {
-      if (freq >= s.freq * 0.98) {
+      if (freq >= s.freq * 0.96) {
         const semitones = Math.round(12 * Math.log2(freq / s.freq));
-        if (semitones >= 0 && semitones <= 22 && semitones < minFret) {
-          minFret = semitones;
-          bestString = s.string;
-          bestFret = semitones;
+        if (semitones >= 0 && semitones <= 16) {
+          const fretPenalty = semitones * 0.4;
+          const strPenalty = stringWeights[s.string] ?? 1.0;
+          const penalty = fretPenalty + strPenalty;
+          if (penalty < lowestPenalty) {
+            lowestPenalty = penalty;
+            bestString = s.string;
+            bestFret = semitones;
+          }
         }
       }
     }
@@ -125,8 +132,8 @@ export class TranscriptionService {
   static yinPitch(
     slice: Float32Array,
     sampleRate: number,
-    minFreq: number = 75,
-    maxFreq: number = 850,
+    minFreq: number = 135,
+    maxFreq: number = 880,
     threshold: number = 0.18
   ): number | null {
     const minLag = Math.floor(sampleRate / maxFreq);
@@ -232,27 +239,49 @@ export class TranscriptionService {
     let estimatedBpm = durationMin > 0 ? Math.round(beatCount / durationMin) : 130;
     if (estimatedBpm < 70) estimatedBpm = estimatedBpm * 2;
     if (estimatedBpm > 175) estimatedBpm = Math.round(estimatedBpm / 2);
-    if (estimatedBpm < 70 || estimatedBpm > 175) estimatedBpm = 130;
+    if (estimatedBpm < 70 || estimatedBpm > 175) estimatedBpm = 133;
 
-    // 2. YIN Pitch & note onset detection
+    // 2. Onset detection via energy flux
+    const hopSize = Math.floor(sampleRate * 0.02); // 20ms
+    const winSize = Math.floor(sampleRate * 0.05); // 50ms
+    const onsetEnergies: number[] = [];
+    for (let i = 0; i < channelData.length - winSize; i += hopSize) {
+      let sum = 0;
+      for (let j = 0; j < winSize; j++) {
+        const s = channelData[i + j];
+        sum += s * s;
+      }
+      onsetEnergies.push(Math.sqrt(sum / winSize));
+    }
+
+    const onsets: number[] = [];
+    const minSpacing = Math.floor(0.20 / (hopSize / sampleRate)); // at least 200ms between notes
+    let lastOnset = -minSpacing;
+    const avgOnsetEnergy = onsetEnergies.reduce((a, b) => a + b, 0) / (onsetEnergies.length || 1);
+    const energyThresh = avgOnsetEnergy * 1.2;
+
+    for (let i = 1; i < onsetEnergies.length - 1; i++) {
+      if (onsetEnergies[i] > energyThresh && onsetEnergies[i] > onsetEnergies[i - 1] && onsetEnergies[i] > onsetEnergies[i + 1]) {
+        if (i - lastOnset >= minSpacing) {
+          onsets.push((i * hopSize) / sampleRate);
+          lastOnset = i;
+        }
+      }
+    }
+
     const detectedNotes: AudioAnalysisSummary['detectedPitchNotes'] = [];
     const beatSec = 60 / estimatedBpm;
     const totalBeats = Math.min(Math.floor(durationSeconds / beatSec), 32);
+    const onsetsToSample = onsets.length >= 10 ? onsets : Array.from({ length: totalBeats }, (_, b) => b * beatSec);
 
-    for (let b = 0; b < totalBeats; b++) {
-      const time = b * beatSec;
+    for (const time of onsetsToSample.slice(0, 32)) {
       const offset = Math.floor(time * sampleRate);
       const slice = channelData.subarray(offset, Math.min(offset + 4096, channelData.length));
-      if (slice.length < 2048) break;
+      if (slice.length < 2048) continue;
 
-      // Check RMS
-      let rmsSum = 0;
-      for (let j = 0; j < slice.length; j++) rmsSum += slice[j] * slice[j];
-      const rms = Math.sqrt(rmsSum / slice.length);
-      if (rms < 0.015) continue;
-
-      const freq = this.yinPitch(slice, sampleRate);
-      if (freq && freq >= 75 && freq <= 850) {
+      // Extract fundamental pitch in guitar melody range (135Hz to 880Hz, rejecting sub-bass)
+      const freq = this.yinPitch(slice, sampleRate, 135, 880);
+      if (freq && freq >= 135 && freq <= 880) {
         const fretInfo = this.freqToGuitarFret(freq);
         detectedNotes.push({
           time: Math.round(time * 100) / 100,
@@ -304,14 +333,14 @@ export class TranscriptionService {
     const has = (p: string) => pitches.includes(p);
 
     if (has('D') && (has('F') || has('A'))) list.push('Dm');
-    if (has('A#') || has('Bb') || (has('D') && has('F'))) list.push('Bb');
+    if (has('A#') || has('Bb')) list.push('Bb');
+    if (has('A') && (has('C') || has('E'))) list.push('Am');
     if (has('F') && (has('A') || has('C'))) list.push('F');
     if (has('C') && (has('E') || has('G'))) list.push('C');
-    if (has('A') && (has('C') || has('E'))) list.push('Am');
     if (has('G') && (has('B') || has('D'))) list.push('G');
     if (has('E') && (has('G') || has('B'))) list.push('Em');
 
-    return list.length > 0 ? list : ['Dm', 'Bb', 'F', 'C'];
+    return list.length > 0 ? list : ['Bb', 'Dm', 'Am', 'F', 'C'];
   }
 
   /**
@@ -331,34 +360,36 @@ export class TranscriptionService {
 
     // 1. Try local server-assisted transcription endpoint first if a file is provided
     if (params.file) {
-      try {
-        const formData = new FormData();
-        formData.append('audio', params.file);
-        formData.append('title', title);
-        formData.append('artist', artist);
+      for (const endpoint of ['http://127.0.0.1:5000/api/transcribe', 'http://127.0.0.1:5000/api/transcribe-audio', 'http://localhost:5000/api/transcribe', 'http://localhost:5000/api/transcribe-audio']) {
+        try {
+          const formData = new FormData();
+          formData.append('audio', params.file);
+          formData.append('title', title);
+          formData.append('artist', artist);
 
-        const serverRes = await fetch('http://localhost:5000/api/transcribe-audio', {
-          method: 'POST',
-          body: formData,
-          signal: AbortSignal.timeout(6000)
-        });
+          const serverRes = await fetch(endpoint, {
+            method: 'POST',
+            body: formData,
+            signal: AbortSignal.timeout(6000)
+          });
 
-        if (serverRes.ok) {
-          const data = await serverRes.json();
-          if (data.success && data.notes && data.notes.length > 0) {
-            return {
-              ...data,
-              sourceType: params.sourceType,
-              sourceUrl: params.sourceUrl
-            };
+          if (serverRes.ok) {
+            const data = await serverRes.json();
+            if (data.success && data.notes && data.notes.length > 0) {
+              return {
+                ...data,
+                sourceType: params.sourceType,
+                sourceUrl: params.sourceUrl
+              };
+            }
           }
+        } catch {
+          // try next endpoint
         }
-      } catch (e) {
-        console.warn('Local Python audio perception endpoint not reachable, running client Web Audio engine:', e);
       }
     }
 
-    const bpm = params.audioAnalysis?.estimatedBpm || 130;
+    const bpm = params.audioAnalysis?.estimatedBpm || 133;
     const key = params.audioAnalysis?.detectedKey || 'D Minor';
 
     // 2. Try structured AI prompt if local LLM is available
@@ -444,45 +475,41 @@ Output MUST be valid JSON adhering to:
         });
       });
     } else {
-      // Build beat-aligned notes based on the detected chords and BPM
-      const beatSec = 60 / (bpm || 130);
-      const chordRoots: Record<string, { s: number; f: number; n: string }> = {
-        'Dm': { s: 4, f: 0, n: 'D3' },
-        'D':  { s: 4, f: 0, n: 'D3' },
-        'Bb': { s: 5, f: 1, n: 'A#2' },
-        'F':  { s: 6, f: 1, n: 'F2' },
-        'C':  { s: 5, f: 3, n: 'C3' },
-        'Gm': { s: 6, f: 3, n: 'G2' },
-        'Am': { s: 5, f: 0, n: 'A2' },
-        'A':  { s: 5, f: 0, n: 'A2' },
-        'Em': { s: 6, f: 0, n: 'E2' },
-        'G':  { s: 6, f: 3, n: 'G2' }
+      // Build melodic guitar riff notes on strings 1-4 based on detected progression and BPM
+      const beatSec = 60 / (bpm || 133);
+      const melodicVoicings: Record<string, { s: number; f: number; n: string; altS: number; altF: number; altN: string }> = {
+        'Dm': { s: 2, f: 3, n: 'D4', altS: 4, altF: 0, altN: 'D3' },
+        'D':  { s: 2, f: 3, n: 'D4', altS: 3, altF: 2, altN: 'A3' },
+        'Bb': { s: 3, f: 3, n: 'A#3', altS: 2, altF: 3, altN: 'D4' },
+        'F':  { s: 4, f: 3, n: 'F3', altS: 1, altF: 1, altN: 'F4' },
+        'C':  { s: 2, f: 1, n: 'C4', altS: 3, altF: 0, altN: 'G3' },
+        'Gm': { s: 3, f: 0, n: 'G3', altS: 3, altF: 3, altN: 'A#3' },
+        'Am': { s: 3, f: 2, n: 'A3', altS: 4, altF: 2, altN: 'E3' },
+        'A':  { s: 3, f: 2, n: 'A3', altS: 5, altF: 4, altN: 'C#3' },
+        'Em': { s: 4, f: 2, n: 'E3', altS: 1, altF: 0, altN: 'E4' },
+        'G':  { s: 3, f: 0, n: 'G3', altS: 2, altF: 3, altN: 'D4' }
       };
 
       for (let i = 0; i < 24; i++) {
         const chord = chords[Math.floor(i / 4) % chords.length] || 'Dm';
-        const root = chordRoots[chord] || { s: 4, f: 0, n: 'D3' };
+        const v = melodicVoicings[chord] || melodicVoicings['Dm'];
         const time = Math.round(i * beatSec * 100) / 100;
 
         if (i % 2 === 0) {
           notes.push({
-            string: root.s,
-            fret: root.f,
-            noteName: root.n,
+            string: v.s,
+            fret: v.f,
+            noteName: v.n,
             time,
             duration: Math.round(beatSec * 0.8 * 100) / 100,
             chordSymbol: chord,
             technique: 'pick'
           });
         } else {
-          // Melodic or fifth accent
-          const accentString = Math.max(1, root.s - 1);
-          const accentFret = (root.f + 2) % 12;
-          const accentNote = this.freqToGuitarFret(STRING_BASE_FREQS.find(s => s.string === accentString)?.freq || 196);
           notes.push({
-            string: accentString,
-            fret: accentFret,
-            noteName: accentNote.noteName,
+            string: v.altS,
+            fret: v.altF,
+            noteName: v.altN,
             time,
             duration: Math.round(beatSec * 0.8 * 100) / 100,
             chordSymbol: chord,
