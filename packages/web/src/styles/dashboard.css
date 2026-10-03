@@ -1,0 +1,258 @@
+/* Dashboard Page Styles */
+.dashboard-page-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100vw;
+  background: radial-gradient(circle at 0% 0%, rgba(124, 58, 237, 0.08) 0%, transparent 40%),
+              radial-gradient(circle at 100% 100%, rgba(245, 158, 11, 0.05) 0%, transparent 40%),
+              var(--bg-main);
+}
+
+.dashboard-main {
+  flex-grow: 1;
+  max-width: 1000px;
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-6) 80px; /* offset bottom nav */
+}
+
+/* Greeting Styles */
+.greeting-subtitle {
+  text-transform: uppercase;
+  font-size: var(--text-xs);
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.user-display-name {
+  font-size: var(--text-xl);
+  font-weight: 700;
+}
+
+/* Lesson card styling */
+.main-lesson-card {
+  padding: var(--space-8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.lesson-glow-bg {
+  position: absolute;
+  top: -50%;
+  right: -20%;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.15) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.lesson-title {
+  font-size: var(--text-2xl);
+  line-height: 1.2;
+}
+
+.lesson-progress-circle {
+  position: relative;
+  width: 90px;
+  height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.progress-ring-text {
+  position: absolute;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+/* Grid columns for desktop sizing */
+.grid-layout-columns {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: var(--space-6);
+}
+
+@media (max-width: 768px) {
+  .grid-layout-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Weekly Progress Chart */
+.weekly-bar-chart {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  height: 150px;
+  padding: var(--space-4) 0 0;
+}
+
+.chart-bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-grow: 1;
+  position: relative;
+  cursor: pointer;
+}
+
+.chart-bar-track {
+  width: 16px;
+  height: 100px;
+  background: var(--bg-input);
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  margin-bottom: var(--space-2);
+}
+
+.chart-bar-fill {
+  width: 100%;
+  background: var(--gradient-primary);
+  border-radius: var(--radius-full);
+  transition: height var(--transition-slow) cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.chart-bar-label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.chart-bar-tooltip {
+  position: absolute;
+  top: -24px;
+  background: var(--bg-card-elevated);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+  font-size: 10px;
+  color: var(--text-primary);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-fast);
+}
+
+.chart-bar-col:hover .chart-bar-tooltip {
+  opacity: 1;
+}
+
+.chart-bar-col:hover .chart-bar-fill {
+  background: var(--gradient-accent);
+}
+
+/* Roadmap Timeline */
+.roadmap-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  position: relative;
+  padding-left: var(--space-4);
+}
+
+.roadmap-timeline::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: 23px;
+  bottom: 10px;
+  width: 2px;
+  background: var(--bg-input);
+}
+
+.roadmap-node {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+  position: relative;
+}
+
+.node-bullet {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  z-index: 2;
+}
+
+.active-node .node-bullet {
+  background: var(--color-primary-light);
+  color: #ffffff;
+  box-shadow: 0 0 10px var(--color-primary-light);
+}
+
+.pending-node .node-bullet {
+  background: var(--bg-input);
+  color: var(--text-muted);
+  border: 2px solid var(--text-disabled);
+}
+
+.locked-node .node-bullet {
+  background: var(--bg-main);
+  color: var(--text-disabled);
+  border: 2px solid var(--bg-input);
+}
+
+.node-content h4 {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  margin: 0;
+}
+
+/* Coach card details */
+.coach-bubble-avatar {
+  border-radius: var(--radius-full);
+}
+
+#coach-quick-card:hover {
+  border-color: var(--color-primary-light);
+}
+
+/* Achievements badges list */
+.achievements-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+
+.achievement-badge-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 75px;
+  background: var(--bg-glass);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  text-align: center;
+  transition: all var(--transition-fast);
+}
+
+.achievement-badge-card .badge-icon {
+  font-size: 1.5rem;
+}
+
+.achievement-badge-card .badge-title {
+  font-size: 9px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  margin-top: var(--space-1);
+}
+
+.badge-card-locked {
+  filter: grayscale(100%);
+  opacity: 0.4;
+}
+
+.achievement-badge-card:hover:not(.badge-card-locked) {
+  transform: scale(1.05);
+  border-color: rgba(255, 255, 255, 0.15);
+}

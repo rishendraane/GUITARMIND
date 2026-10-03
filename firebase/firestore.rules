@@ -1,0 +1,147 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================
+    // HELPER FUNCTIONS
+    // ============================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isValidTimestamp(field) {
+      return field is timestamp;
+    }
+    
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+    
+    // ============================================
+    // USER DOCUMENTS
+    // ============================================
+    
+    match /users/{userId} {
+      // Users can only read/write their own data
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) 
+        && hasRequiredFields(['email', 'displayName', 'createdAt']);
+      allow update: if isOwner(userId);
+      allow delete: if false; // Users cannot delete their accounts via client
+      
+      // All user subcollections follow same ownership pattern
+      match /guitars/{guitarId} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      match /practice_sessions/{sessionId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update: if isOwner(userId);
+        allow delete: if false; // Preserve history
+      }
+      
+      match /achievements/{achievementId} {
+        allow read: if isOwner(userId);
+        allow create: if false; // Only Cloud Functions can award
+        allow update: if isOwner(userId) 
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['shared', 'shareCardURL']);
+      }
+      
+      match /ai_conversations/{convId} {
+        allow read, write: if isOwner(userId);
+        
+        match /messages/{msgId} {
+          allow read, write: if isOwner(userId);
+        }
+      }
+      
+      match /roadmap/{roadmapId} {
+        allow read, write: if isOwner(userId);
+        
+        match /stages/{stageId} {
+          allow read, write: if isOwner(userId);
+          
+          match /tasks/{taskId} {
+            allow read, write: if isOwner(userId);
+          }
+        }
+      }
+      
+      match /calendar_events/{eventId} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      match /saved_songs/{songId} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      match /weekly_reports/{reportId} {
+        allow read: if isOwner(userId);
+        allow write: if false; // Only Cloud Functions
+      }
+      
+      match /ear_training/{sessionId} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      match /theory_progress/{moduleId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+    
+    // ============================================
+    // PUBLIC / SHARED CONTENT (Read-only for users)
+    // ============================================
+    
+    match /songs/{songId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Admin / Cloud Functions only
+      
+      match /sections/{sectionId} {
+        allow read: if isAuthenticated();
+        allow write: if false;
+      }
+    }
+    
+    match /lessons/{lessonId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+      
+      match /steps/{stepId} {
+        allow read: if isAuthenticated();
+        allow write: if false;
+      }
+    }
+    
+    match /exercises/{exerciseId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+    
+    match /challenges/{challengeId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+    
+    match /backing_tracks/{trackId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+    
+    match /theory_modules/{moduleId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+    
+    match /system_config/{configId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+  }
+}

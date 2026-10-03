@@ -1,0 +1,72 @@
+/* Bottom Navigation Bar Styles */
+.bottom-navigation-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: rgba(17, 17, 24, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: var(--space-2) 0;
+  z-index: var(--z-nav);
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.3);
+}
+
+.nav-container {
+  display: flex;
+  max-width: 600px;
+  margin: 0 auto;
+  justify-content: space-around;
+  padding: 0 var(--space-4);
+}
+
+.nav-tab-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-4);
+  text-decoration: none;
+  color: var(--text-muted);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-xs);
+  transition: all var(--transition-fast);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+}
+
+.nav-tab-icon {
+  font-size: 1.5rem;
+  transition: transform var(--transition-fast) cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.nav-tab-label {
+  letter-spacing: 0.02em;
+}
+
+/* Hover and Active State styling */
+.nav-tab-item:hover {
+  color: var(--text-primary);
+}
+
+.nav-tab-item:hover .nav-tab-icon {
+  transform: translateY(-2px) scale(1.1);
+}
+
+.nav-tab-item-active {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.nav-tab-item-active .nav-tab-icon {
+  transform: translateY(-2px) scale(1.1);
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.3));
+}
+
+/* Click feedback scale animation */
+.nav-tab-clicked {
+  transform: scale(0.92);
+}

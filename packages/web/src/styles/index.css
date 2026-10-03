@@ -1,0 +1,18 @@
+/* Google Fonts Import */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700&display=swap');
+
+/* import stylesheet modules */
+@import './variables.css';
+@import './reset.css';
+@import './base.css';
+@import './animations.css';
+@import './components.css';
+@import './utilities.css';
+@import './auth.css';
+@import './onboarding.css';
+@import './nav.css';
+@import './dashboard.css';
+@import './tuner.css';
+@import './coach.css';
+@import './settings.css';
+@import './practice.css';

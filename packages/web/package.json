@@ -1,0 +1,21 @@
+{
+  "name": "@guitarmind/web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@guitarmind/core": "*",
+    "@supabase/supabase-js": "^2.107.0",
+    "firebase": "^11.0.0",
+    "pitchy": "^4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2",
+    "vite": "^8.0.12"
+  }
+}

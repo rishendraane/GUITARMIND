@@ -1,0 +1,43 @@
+/* Settings Page Styles */
+.settings-page-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100vw;
+  background: radial-gradient(circle at 10% 10%, rgba(124, 58, 237, 0.05) 0%, transparent 40%),
+              radial-gradient(circle at 90% 90%, rgba(59, 130, 246, 0.05) 0%, transparent 40%),
+              #0a0a0f;
+}
+
+.settings-main {
+  flex-grow: 1;
+  max-width: 600px;
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-6) 80px;
+}
+
+.section-title {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-primary-light);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: var(--space-2);
+}
+
+.setting-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.border-bottom {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.setting-item h4 {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}

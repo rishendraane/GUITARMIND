@@ -1,0 +1,147 @@
+/* Practice Studio Page Styles */
+.practice-page-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100vw;
+  background: radial-gradient(circle at 5% 5%, rgba(245, 158, 11, 0.05) 0%, transparent 40%),
+              radial-gradient(circle at 95% 5%, rgba(124, 58, 237, 0.08) 0%, transparent 40%),
+              var(--bg-main);
+}
+
+.practice-main {
+  flex-grow: 1;
+  max-width: 1000px;
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-6) 80px;
+}
+
+/* Fretboard chord diagram widgets */
+.fretboard-widget {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: all var(--transition-base);
+}
+
+.fretboard-widget-active {
+  background: rgba(124, 58, 237, 0.08);
+  border-color: var(--color-primary-light);
+  box-shadow: 0 0 15px var(--color-primary-glow);
+  transform: scale(1.03);
+}
+
+.chord-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.fretboard-text {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.25;
+  color: var(--text-muted);
+  margin: 0;
+  white-space: pre;
+}
+
+.fretboard-widget-active .fretboard-text {
+  color: var(--text-secondary);
+}
+
+/* Canvas signal visualizer block */
+#visualizer-canvas {
+  width: 100%;
+  height: 96px;
+  background: #060609;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
+}
+
+/* Mood buttons styling */
+.btn-mood {
+  transition: all var(--transition-fast) !important;
+}
+
+.btn-mood-selected {
+  background: var(--gradient-primary) !important;
+  color: #ffffff !important;
+  border-color: var(--color-primary-light) !important;
+  box-shadow: 0 0 10px var(--color-primary-glow);
+}
+
+/* Scroll adjustments inside Coaching Summary block */
+#modal-ai-feedback {
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+/* Fretboard studio styles */
+.fretboard-container-scroll {
+  background: #060609;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  padding: var(--space-8) var(--space-4) var(--space-4);
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
+}
+
+.fretboard-string-row {
+  position: relative;
+}
+
+.fret-node {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  z-index: 10;
+  position: relative;
+  padding: 0;
+}
+
+.fret-node:hover {
+  background: var(--bg-card-elevated);
+  transform: scale(1.15);
+  border-color: var(--color-primary-light);
+}
+
+.fret-node-active {
+  background: var(--gradient-primary) !important;
+  color: #ffffff !important;
+  border-color: var(--color-primary-light) !important;
+  transform: scale(1.2);
+  box-shadow: 0 0 10px var(--color-primary-glow);
+}
+
+.fret-node-dot {
+  width: 4px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: var(--radius-full);
+}
+
+.fret-node-active .fret-node-dot {
+  background: #ffffff;
+}
+
+.fret-markers {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+

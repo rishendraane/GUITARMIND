@@ -1,0 +1,13 @@
+{
+  "name": "guitarmind",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev -w packages/web",
+    "build:web": "npm run build -w packages/web",
+    "dev:functions": "npm run dev -w firebase/functions"
+  }
+}
