@@ -29,6 +29,148 @@ let uploadedAudioUrl: string | null = null;
 let uploadedAudioAnalysis: AudioAnalysisSummary | null = null;
 let playbackSpeed: number = 1.0;
 let isAudioSynthesizing: boolean = false;
+let currentTrackASource: 'upload' | 'youtube' | 'stream' = 'upload';
+let currentYouTubeVideoId: string | null = null;
+let isYouTubePlaying: boolean = false;
+
+function extractYouTubeVideoId(url: string): string | null {
+  if (!url) return null;
+  const clean = url.trim();
+  const match = clean.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/);
+  if (match && match[1]) return match[1];
+  if (/^[\w-]{11}$/.test(clean)) return clean;
+  return null;
+}
+
+function setupTrackAForYouTube(videoId: string, title: string): void {
+  currentTrackASource = 'youtube';
+  currentYouTubeVideoId = videoId;
+  isYouTubePlaying = false;
+
+  const audioCont = document.getElementById('container-track-a-audio');
+  const ytCont = document.getElementById('container-track-a-youtube');
+  const iframe = document.getElementById('youtube-embed-iframe') as HTMLIFrameElement;
+  const label = document.getElementById('original-audio-track-label');
+  const badge = document.getElementById('track-a-source-badge');
+  const originalAudioPlayer = document.getElementById('original-audio-player') as HTMLAudioElement;
+  const btnSoloA = document.getElementById('btn-solo-a');
+
+  if (originalAudioPlayer && !originalAudioPlayer.paused) {
+    originalAudioPlayer.pause();
+  }
+
+  if (audioCont) audioCont.classList.add('hidden');
+  if (ytCont) ytCont.classList.remove('hidden');
+  if (iframe) {
+    iframe.src = `https://www.youtube-nocookie.com/embed/${videoId}?enablejsapi=1`;
+  }
+  if (label) label.textContent = `YouTube: ${title}`;
+  if (badge) {
+    badge.textContent = 'YouTube Audio';
+    badge.style.background = 'rgba(239, 68, 68, 0.15)';
+    badge.style.color = '#f87171';
+    badge.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+  }
+  if (btnSoloA) {
+    btnSoloA.innerHTML = `${icons.play('w-3 h-3')} <span>Play YouTube Audio</span>`;
+  }
+}
+
+function setupTrackAForUploadedFile(file: File): void {
+  currentTrackASource = 'upload';
+  currentYouTubeVideoId = null;
+  isYouTubePlaying = false;
+
+  const audioCont = document.getElementById('container-track-a-audio');
+  const ytCont = document.getElementById('container-track-a-youtube');
+  const iframe = document.getElementById('youtube-embed-iframe') as HTMLIFrameElement;
+  const label = document.getElementById('original-audio-track-label');
+  const badge = document.getElementById('track-a-source-badge');
+  const btnSoloA = document.getElementById('btn-solo-a');
+
+  if (iframe) iframe.src = 'about:blank';
+  if (ytCont) ytCont.classList.add('hidden');
+  if (audioCont) audioCont.classList.remove('hidden');
+  if (label) label.textContent = `${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)`;
+  if (badge) {
+    badge.textContent = 'Track A';
+    badge.style.background = 'rgba(59, 130, 246, 0.15)';
+    badge.style.color = '#60a5fa';
+    badge.style.border = '1px solid rgba(59, 130, 246, 0.3)';
+  }
+  if (btnSoloA) {
+    btnSoloA.innerHTML = `${icons.play('w-3 h-3')} <span>Play Original</span>`;
+  }
+}
+
+function setupTrackAForAudioStream(streamUrl: string, title: string): void {
+  currentTrackASource = 'stream';
+  currentYouTubeVideoId = null;
+  isYouTubePlaying = false;
+
+  const audioCont = document.getElementById('container-track-a-audio');
+  const ytCont = document.getElementById('container-track-a-youtube');
+  const iframe = document.getElementById('youtube-embed-iframe') as HTMLIFrameElement;
+  const label = document.getElementById('original-audio-track-label');
+  const badge = document.getElementById('track-a-source-badge');
+  const originalAudioPlayer = document.getElementById('original-audio-player') as HTMLAudioElement;
+  const btnSoloA = document.getElementById('btn-solo-a');
+
+  if (iframe) iframe.src = 'about:blank';
+  if (ytCont) ytCont.classList.add('hidden');
+  if (audioCont) audioCont.classList.remove('hidden');
+  if (originalAudioPlayer) {
+    originalAudioPlayer.src = streamUrl;
+  }
+  if (label) label.textContent = title;
+  if (badge) {
+    badge.textContent = 'Web Stream';
+    badge.style.background = 'rgba(59, 130, 246, 0.15)';
+    badge.style.color = '#60a5fa';
+    badge.style.border = '1px solid rgba(59, 130, 246, 0.3)';
+  }
+  if (btnSoloA) {
+    btnSoloA.innerHTML = `${icons.play('w-3 h-3')} <span>Play Original</span>`;
+  }
+}
+
+function playTrackA(): void {
+  if (isAudioSynthesizing) stopPlayback();
+
+  const btnSoloA = document.getElementById('btn-solo-a');
+  if (currentTrackASource === 'youtube' && currentYouTubeVideoId) {
+    const iframe = document.getElementById('youtube-embed-iframe') as HTMLIFrameElement;
+    if (iframe && iframe.contentWindow) {
+      iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: '' }), '*');
+      isYouTubePlaying = true;
+      if (btnSoloA) btnSoloA.innerHTML = `${icons.pause('w-3 h-3')} <span>Pause YouTube</span>`;
+    }
+  } else {
+    const originalAudioPlayer = document.getElementById('original-audio-player') as HTMLAudioElement;
+    if (originalAudioPlayer) {
+      originalAudioPlayer.play().catch(e => console.warn('Could not play track A:', e));
+      if (btnSoloA) btnSoloA.innerHTML = `${icons.pause('w-3 h-3')} <span>Pause Track A</span>`;
+    }
+  }
+}
+
+function pauseTrackA(): void {
+  const btnSoloA = document.getElementById('btn-solo-a');
+  if (currentTrackASource === 'youtube') {
+    const iframe = document.getElementById('youtube-embed-iframe') as HTMLIFrameElement;
+    if (iframe && iframe.contentWindow) {
+      iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: '' }), '*');
+      isYouTubePlaying = false;
+      if (btnSoloA) btnSoloA.innerHTML = `${icons.play('w-3 h-3')} <span>Play YouTube Audio</span>`;
+    }
+  } else {
+    const originalAudioPlayer = document.getElementById('original-audio-player') as HTMLAudioElement;
+    if (originalAudioPlayer) {
+      originalAudioPlayer.pause();
+      if (btnSoloA) btnSoloA.innerHTML = `${icons.play('w-3 h-3')} <span>Play Original</span>`;
+    }
+  }
+}
 
 export const youtubeRoute = {
   path: '#youtube',
@@ -296,15 +438,27 @@ export const youtubeRoute = {
                         <span id="original-audio-track-label" class="text-xxs text-muted-color">Uploaded Recording</span>
                       </div>
                     </div>
-                    <span class="badge text-xxs py-0.5 px-2 font-mono" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3);">Track A</span>
+                    <span id="track-a-source-badge" class="badge text-xxs py-0.5 px-2 font-mono" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3);">Track A</span>
                   </div>
                   
-                  <div class="my-1">
+                  <!-- Container for HTML5 Audio Player (When audio file is uploaded or direct stream) -->
+                  <div id="container-track-a-audio" class="my-1">
                     <audio id="original-audio-player" controls class="w-full" style="height: 38px; border-radius: 6px;"></audio>
                   </div>
 
+                  <!-- Container for YouTube Embed Video/Audio (When YouTube link is entered) -->
+                  <div id="container-track-a-youtube" class="hidden my-1 flex flex-col gap-1.5">
+                    <div class="relative w-full rounded-lg overflow-hidden border border-glass shadow-lg" style="height: 140px; background: #000;">
+                      <iframe id="youtube-embed-iframe" class="w-full h-full" src="" title="Original YouTube Song Audio" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+                    </div>
+                    <span class="text-xxxs text-muted-color flex items-center gap-1">
+                      ${icons.video('w-3 h-3 text-red-500')}
+                      <span>Live YouTube Stream Sync Active • Direct from YouTube</span>
+                    </span>
+                  </div>
+
                   <div class="flex items-center justify-between text-xxs text-muted-color">
-                    <span>Authentic source audio performance</span>
+                    <span id="track-a-status-text">Authentic source audio performance</span>
                     <button type="button" id="btn-solo-a" class="btn btn-secondary btn-sm py-1 px-2.5 text-xxs flex items-center gap-1">
                       ${icons.play('w-3 h-3')}
                       <span>Play Original</span>
@@ -540,10 +694,7 @@ function setupTranscriberLogic(): void {
     if (originalAudioPlayer) {
       originalAudioPlayer.src = uploadedAudioUrl;
     }
-    const trackLabel = document.getElementById('original-audio-track-label');
-    if (trackLabel) {
-      trackLabel.textContent = `${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)`;
-    }
+    setupTrackAForUploadedFile(file);
 
     if (fileNameDisplay) fileNameDisplay.textContent = file.name;
     if (fileMetaDisplay) fileMetaDisplay.textContent = `${(file.size / (1024 * 1024)).toFixed(2)} MB • Decoding audio buffer...`;
@@ -617,31 +768,40 @@ function setupTranscriberLogic(): void {
   const btnSoloB = document.getElementById('btn-solo-b');
   const originalAudioPlayer = document.getElementById('original-audio-player') as HTMLAudioElement;
 
-  if (btnSoloA && originalAudioPlayer) {
+  if (btnSoloA) {
     btnSoloA.addEventListener('click', () => {
-      if (isAudioSynthesizing) stopPlayback();
-      if (originalAudioPlayer.paused) {
-        originalAudioPlayer.play().catch(e => console.warn('Could not play track A:', e));
-        btnSoloA.innerHTML = `${icons.pause('w-3 h-3')} <span>Pause Track A</span>`;
-      } else {
-        originalAudioPlayer.pause();
-        btnSoloA.innerHTML = `${icons.play('w-3 h-3')} <span>Play Original</span>`;
+      if (currentTrackASource === 'youtube') {
+        if (isYouTubePlaying) {
+          pauseTrackA();
+        } else {
+          playTrackA();
+        }
+      } else if (originalAudioPlayer) {
+        if (originalAudioPlayer.paused) {
+          playTrackA();
+        } else {
+          pauseTrackA();
+        }
       }
     });
 
-    originalAudioPlayer.addEventListener('pause', () => {
-      if (btnSoloA) btnSoloA.innerHTML = `${icons.play('w-3 h-3')} <span>Play Original</span>`;
-    });
-    originalAudioPlayer.addEventListener('ended', () => {
-      if (btnSoloA) btnSoloA.innerHTML = `${icons.play('w-3 h-3')} <span>Play Original</span>`;
-    });
+    if (originalAudioPlayer) {
+      originalAudioPlayer.addEventListener('pause', () => {
+        if (currentTrackASource !== 'youtube' && btnSoloA) {
+          btnSoloA.innerHTML = `${icons.play('w-3 h-3')} <span>Play Original</span>`;
+        }
+      });
+      originalAudioPlayer.addEventListener('ended', () => {
+        if (currentTrackASource !== 'youtube' && btnSoloA) {
+          btnSoloA.innerHTML = `${icons.play('w-3 h-3')} <span>Play Original</span>`;
+        }
+      });
+    }
   }
 
   if (btnSoloB) {
     btnSoloB.addEventListener('click', () => {
-      if (originalAudioPlayer && !originalAudioPlayer.paused) {
-        originalAudioPlayer.pause();
-      }
+      pauseTrackA();
       if (isAudioSynthesizing) {
         pausePlayback();
       } else {
@@ -955,6 +1115,18 @@ async function runTranscription(params: {
   let detectedTitle = params.titleOverride;
   let detectedArtist = params.artistOverride;
 
+  // Setup Track A player immediately for link / upload
+  if (params.sourceType === 'link' && params.sourceUrl) {
+    const vId = extractYouTubeVideoId(params.sourceUrl);
+    if (vId) {
+      setupTrackAForYouTube(vId, detectedTitle || 'YouTube Song');
+    } else {
+      setupTrackAForAudioStream(params.sourceUrl, detectedTitle || 'Audio Stream');
+    }
+  } else if (params.sourceType === 'upload' && params.file) {
+    setupTrackAForUploadedFile(params.file);
+  }
+
   // If link, fetch YouTube oEmbed
   if (params.sourceType === 'link' && params.sourceUrl && !detectedTitle) {
     try {
@@ -964,6 +1136,10 @@ async function runTranscription(params: {
         const metadata = await res.json();
         detectedTitle = metadata.title;
         detectedArtist = metadata.author_name;
+        const vId = extractYouTubeVideoId(params.sourceUrl);
+        if (vId) {
+          setupTrackAForYouTube(vId, detectedTitle || 'YouTube Track');
+        }
       }
     } catch {
       // Continue with link string
@@ -1301,6 +1477,7 @@ function highlightActiveNote(note: TranscribedNote, index: number): void {
 
 function startPlayback(): void {
   if (!activeTranscription || activeTranscription.notes.length === 0) return;
+  pauseTrackA();
   isAudioSynthesizing = true;
 
   const btnPlay = document.getElementById('btn-tab-play');
