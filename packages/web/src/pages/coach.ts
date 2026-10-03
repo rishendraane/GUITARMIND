@@ -3,7 +3,6 @@ import { AIService } from '../services/ai';
 import { renderNav, setupNavEvents } from '../components/nav';
 import { COACH_PERSONALITIES, type CoachPersonalityId } from '@guitarmind/core';
 import { ConversationsRepo } from '../repositories/conversations.repo';
-import { supabase } from '../lib/supabase';
 import { icons } from '../components/icons';
 import { LocalVisionService } from '../services/local-vision';
 
@@ -40,19 +39,7 @@ export const coachRoute = {
 
     if (!user) return `Please login first`;
 
-    // 1. Resolve provider and API key structure
-    const activeProvider = user.aiConfig?.provider || 'groq';
-    let keysObj: Record<string, string> = {};
-    try {
-      keysObj = JSON.parse(user.aiConfig?.apiKeyEncrypted || '{}');
-    } catch {
-      if (user.aiConfig?.apiKeyEncrypted) {
-        keysObj[activeProvider] = user.aiConfig.apiKeyEncrypted;
-      }
-    }
-    const hasApiKey = !!keysObj[activeProvider];
-
-    // 2. Load Supabase conversation history
+    // 1. Load conversation history
     try {
       const conversations = await ConversationsRepo.listConversations(user.uid);
       let activeConv = conversations.find(c => c.personalityId === coachId);
@@ -73,22 +60,18 @@ export const coachRoute = {
         activeConversationId = activeConv.id;
         const dbMsgs = await ConversationsRepo.getMessages(activeConv.id);
         if (dbMsgs.length === 0) {
-          if (hasApiKey) {
-            await ConversationsRepo.addMessage(activeConv.id, user.uid, {
-              id: `msg_${Date.now()}_a`,
-              role: 'assistant',
-              content: coach.sampleGreeting,
-              contentType: 'text',
-              timestamp: new Date().toISOString()
-            });
-            conversationHistory = [{
-              sender: 'coach',
-              text: coach.sampleGreeting,
-              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            }];
-          } else {
-            conversationHistory = [];
-          }
+          await ConversationsRepo.addMessage(activeConv.id, user.uid, {
+            id: `msg_${Date.now()}_a`,
+            role: 'assistant',
+            content: coach.sampleGreeting,
+            contentType: 'text',
+            timestamp: new Date().toISOString()
+          });
+          conversationHistory = [{
+            sender: 'coach',
+            text: coach.sampleGreeting,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }];
         } else {
           conversationHistory = dbMsgs.map(m => ({
             sender: m.role === 'user' ? 'user' : 'coach',
@@ -161,7 +144,6 @@ export const coachRoute = {
             </div>
           </header>
 
-          ${hasApiKey ? `
             <!-- Chat Messages -->
             <div class="chat-messages-area flex-grow overflow-y-auto p-4 flex flex-col gap-3" id="chat-messages-container">
               ${messagesHTML}
@@ -213,21 +195,6 @@ export const coachRoute = {
                 ${icons.send('w-4 h-4')}
               </button>
             </form>
-          ` : `
-            <!-- Connect AI Provider Lock Screen -->
-            <div class="flex-grow flex flex-col items-center justify-center p-6 text-center">
-              <div class="glass-card p-6 flex flex-col items-center max-w-sm border-glass text-center animate-scale-in" style="background: rgba(124, 58, 237, 0.03); border: 1px solid var(--border-glass);">
-                <div class="text-primary-color mb-4" style="filter: drop-shadow(0 0 8px rgba(124,58,237,0.3));">
-                  ${icons.lock('w-12 h-12')}
-                </div>
-                <h3 class="m-0 mb-2 font-semibold">Connect AI Provider</h3>
-                <p class="text-xs text-muted-color mb-4">Maya is ready to teach you, but you need to connect your AI Provider key first. We recommend Groq (Llama-3.3-70b-versatile) for the best response speed.</p>
-                <button class="btn btn-primary w-full py-2.5" onclick="window.location.hash = '#settings'">
-                  <span>Configure API Key</span>
-                </button>
-              </div>
-            </div>
-          `}
 
         </main>
 
@@ -739,17 +706,11 @@ function triggerCoachResponse(
       
       // Update local storage diagrams metadata if chord was generated
       if (chordName && diagramsHTML) {
-        const { data: messagesList } = await supabase
-          .from('ai_messages')
-          .select('id')
-          .eq('conversation_id', activeConversationId)
-          .order('created_at', { ascending: false })
-          .limit(1);
-        if (messagesList && messagesList[0]) {
-          await supabase
-            .from('ai_messages')
-            .update({ metadata: { diagramsHTML } })
-            .eq('id', messagesList[0].id);
+        const msgs = await ConversationsRepo.getMessages(activeConversationId);
+        if (msgs.length > 0) {
+          const lastMsg = msgs[msgs.length - 1];
+          lastMsg.metadata = { ...(lastMsg.metadata as any), diagramsHTML };
+          localStorage.setItem(`guitarmind_msgs_${activeConversationId}`, JSON.stringify(msgs));
         }
       }
     } catch (err) {
