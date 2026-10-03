@@ -51,8 +51,24 @@ function loadTheme(): void {
 
 // Start up the application
 const bootstrap = async () => {
-  // Check if we have an offline session saved
-  const offlineUserStr = localStorage.getItem('guitarmind_offline_session');
+  // Check if we have an offline session saved, or initialize default local session
+  let offlineUserStr = localStorage.getItem('guitarmind_offline_session');
+  if (!offlineUserStr) {
+    const defaultUser = {
+      uid: 'offline_user_id',
+      email: 'rocker@local.guitarmind',
+      displayName: 'Guitarist',
+      skillLevel: 'intermediate',
+      streakDays: 5,
+      xp: 1250,
+      level: 3,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    offlineUserStr = JSON.stringify(defaultUser);
+    localStorage.setItem('guitarmind_offline_session', offlineUserStr);
+  }
+
   if (offlineUserStr) {
     try {
       const user = JSON.parse(offlineUserStr);
@@ -64,7 +80,7 @@ const bootstrap = async () => {
       loadTheme();
       setTimeout(() => {
         router.start();
-      }, 1000);
+      }, 500);
       return;
     } catch (e) {
       console.error('Failed to parse offline session', e);
