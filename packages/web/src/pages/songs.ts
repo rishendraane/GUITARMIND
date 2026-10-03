@@ -91,10 +91,16 @@ export const songsRoute = {
               <h2 class="m-0">Song Hub</h2>
             </div>
             
-            <button id="btn-open-creator" class="btn btn-primary btn-sm flex items-center gap-1.5">
-              ${icons.sparkles('w-4 h-4')}
-              <span>Generate AI Song</span>
-            </button>
+            <div class="flex items-center gap-2">
+              <button id="btn-open-transcriber" class="btn btn-secondary btn-sm flex items-center gap-1.5" onclick="window.location.hash='#youtube'">
+                ${icons.music('w-4 h-4')}
+                <span>Transcribe Song</span>
+              </button>
+              <button id="btn-open-creator" class="btn btn-primary btn-sm flex items-center gap-1.5">
+                ${icons.sparkles('w-4 h-4')}
+                <span>Generate AI Song</span>
+              </button>
+            </div>
           </header>
 
           <div class="grid-layout-columns">

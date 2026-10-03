@@ -100,3 +100,40 @@ export interface SongGenerationParams {
   /** Whether to include lyrics */
   includeLyrics: boolean;
 }
+
+/** An individual exact note event in a guitar transcription */
+export interface TranscribedNote {
+  /** Guitar string: 1 (High E), 2 (B), 3 (G), 4 (D), 5 (A), 6 (Low E) */
+  string: number;
+  /** Fret number (0 for open string, up to 24) */
+  fret: number;
+  /** Musical note pitch name (e.g. 'E4', 'G3', 'C#3') */
+  noteName: string;
+  /** Time position in seconds */
+  time: number;
+  /** Duration in seconds */
+  duration: number;
+  /** Associated chord symbol if part of a harmony */
+  chordSymbol?: string;
+  /** Picking or fretting technique */
+  technique?: 'pick' | 'strum' | 'hammer_on' | 'pull_off' | 'slide' | 'bend' | 'vibrato';
+}
+
+/** Complete AI transcribed song package with exact notes, chords, and tabs */
+export interface SongTranscriptionResult {
+  title: string;
+  artist: string;
+  key: string;
+  tempo: number;
+  timeSignature: string;
+  tuning: string;
+  capo: number | null;
+  chords: string[];
+  techniques: string[];
+  tabStaff: string;
+  notes: TranscribedNote[];
+  steps?: { index: number; name: string; desc: string }[];
+  audioDuration?: number;
+  sourceType: 'link' | 'upload';
+  sourceUrl?: string;
+}

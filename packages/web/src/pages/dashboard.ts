@@ -486,8 +486,8 @@ export const dashboardRoute = {
                     <span class="text-xs">Song Hub</span>
                   </button>
                   <button class="btn btn-secondary flex-col items-center gap-2 p-4" onclick="window.location.hash='#youtube'">
-                    <span class="w-6 h-6 flex items-center justify-center text-primary-color">${icons.video('w-6 h-6')}</span>
-                    <span class="text-xs">YouTube AI</span>
+                    <span class="w-6 h-6 flex items-center justify-center text-primary-color">${icons.music('w-6 h-6')}</span>
+                    <span class="text-xs">Song Transcriber</span>
                   </button>
                   <button class="btn btn-secondary flex-col items-center gap-2 p-4" onclick="window.location.hash='#eartraining'">
                     <span class="w-6 h-6 flex items-center justify-center text-primary-color">${icons.headphones('w-6 h-6')}</span>
