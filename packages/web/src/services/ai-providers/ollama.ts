@@ -13,18 +13,17 @@ export class OllamaProvider implements AIProvider {
   /** Order of models to try, best quality first */
   private modelPriority = [
     'guitarmind-ai',   // custom trained guitar coaching model
-    'llama3.2',
     'llama3.2:1b',
-    'llama3.1',
+    'llama3.2',
+    'qwen2.5:7b',
     'llama3.1:8b',
+    'llama3.1',
     'mistral',
     'mistral:7b',
     'gemma2',
     'gemma2:2b',
     'phi3',
     'phi3:mini',
-    'qwen2.5',
-    'qwen2.5:7b',
     'deepseek-r1:7b',
   ];
 
@@ -57,9 +56,9 @@ export class OllamaProvider implements AIProvider {
   }
 
   async generateText(request: AITextRequest, _apiKey: string, modelOverride?: string): Promise<AITextResponse> {
-    const model = await this.selectBestModel(modelOverride || request.model);
-    if (!model) {
-      throw new Error('No Ollama models available. Please run "ollama pull llama3.2" first.');
+    const primaryModel = await this.selectBestModel(modelOverride || request.model);
+    if (!primaryModel) {
+      throw new Error('No Ollama models available. Please start Ollama or pull llama3.2:1b.');
     }
 
     const messages: any[] = [];
@@ -70,29 +69,41 @@ export class OllamaProvider implements AIProvider {
       messages.push({ role: m.role, content: m.content });
     });
 
-    const res = await fetch(`${this.baseUrl}/v1/chat/completions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature: request.temperature ?? 0.7,
-        max_tokens: request.maxTokens || 1024,
-        stream: false,
-      }),
-    });
+    const candidates = Array.from(new Set([primaryModel, 'guitarmind-ai', 'llama3.2:1b']));
+    let lastError: any = null;
 
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`Ollama error ${res.status}: ${errText}`);
+    for (const candidateModel of candidates) {
+      try {
+        const res = await fetch(`${this.baseUrl}/v1/chat/completions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: candidateModel,
+            messages,
+            temperature: request.temperature ?? 0.7,
+            max_tokens: request.maxTokens || 1024,
+            stream: false,
+          }),
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`Ollama error ${res.status}: ${errText}`);
+        }
+
+        const json = await res.json();
+        const text = json.choices?.[0]?.message?.content || '';
+        return {
+          content: text,
+          metadata: { provider: 'groq', model: candidateModel }
+        };
+      } catch (err) {
+        lastError = err;
+        console.warn(`Ollama call with model ${candidateModel} failed, trying next candidate:`, err);
+      }
     }
 
-    const json = await res.json();
-    const text = json.choices?.[0]?.message?.content || '';
-    return {
-      content: text,
-      metadata: { provider: 'groq', model }
-    };
+    throw lastError || new Error('Ollama inference failed.');
   }
 
   async generateStructured<TSchema>(request: AIStructuredRequest<TSchema>, _apiKey: string, modelOverride?: string): Promise<TSchema> {

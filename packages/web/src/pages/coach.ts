@@ -5,14 +5,31 @@ import { COACH_PERSONALITIES, type CoachPersonalityId } from '@guitarmind/core';
 import { ConversationsRepo } from '../repositories/conversations.repo';
 import { icons } from '../components/icons';
 import { LocalVisionService } from '../services/local-vision';
+import { CoachKnowledgeService } from '../services/coach-knowledge';
 
 interface ChatMessage {
   sender: 'user' | 'coach';
   text: string;
   time: string;
   diagramsHTML?: string;
+  actionsHTML?: string;
   imageUrl?: string;
   analysisText?: string;
+}
+
+function formatCoachMessage(text: string): string {
+  if (!text) return '';
+  // Check for code blocks ```...```
+  let formatted = text.replace(/```([\s\S]*?)```/g, (_match, code) => {
+    return `<pre class="bg-black/60 p-2.5 rounded font-mono text-xs text-amber-300 overflow-x-auto my-2 border border-white/10 leading-tight">${code.trim()}</pre>`;
+  });
+  // Check for inline code `...`
+  formatted = formatted.replace(/`([^`]+)`/g, '<code class="font-mono bg-white/10 px-1 py-0.5 rounded text-xs text-amber-300">$1</code>');
+  // Bold **...**
+  formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold text-white">$1</strong>');
+  // Convert newlines to breaks
+  formatted = formatted.replace(/\n\n/g, '<br/><br/>').replace(/\n/g, '<br/>');
+  return formatted;
 }
 
 // Conversation cache in memory to retain chat history between route switches
@@ -78,6 +95,7 @@ export const coachRoute = {
             text: m.content,
             time: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             diagramsHTML: (m.metadata as any)?.diagramsHTML || undefined,
+            actionsHTML: (m.metadata as any)?.actionsHTML || undefined,
             imageUrl: (m.metadata as any)?.imageUrl || undefined,
             analysisText: (m.metadata as any)?.analysisText || undefined
           }));
@@ -108,8 +126,13 @@ export const coachRoute = {
               ` : ''}
             </div>
           ` : ''}
-          <p class="chat-text" style="${m.sender === 'user' ? 'color: #000000 !important;' : 'color: var(--text-primary);'}">${m.text}</p>
+          ${
+            m.sender === 'user'
+              ? `<p class="chat-text" style="color: #000000 !important; font-weight: 500;">${m.text}</p>`
+              : `<div class="chat-text text-sm leading-relaxed" style="color: var(--text-primary);">${formatCoachMessage(m.text)}</div>`
+          }
           ${m.diagramsHTML || ''}
+          ${m.actionsHTML || ''}
           <span class="chat-time">${m.time}</span>
         </div>
       </div>
@@ -656,13 +679,89 @@ function triggerCoachResponse(
     typingIndicator.classList.add('hidden');
 
     let reply = '';
-    const textLower = userText.toLowerCase().trim();
+    let actionsHTML = '';
+    let diagramsHTML = '';
 
     // Check for chord mention in user text
-    const chordName = extractChord(userText);
+    let chordName = extractChord(userText);
 
-    let diagramsHTML = '';
-    if (chordName) {
+    try {
+      if (!user || !activeConversationId) {
+        throw new Error('User session or active conversation is missing.');
+      }
+
+      reply = await AIService.generateContextualResponse(
+        user.uid,
+        activeConversationId,
+        userText,
+        coach.systemPrompt + (chordName ? `\n\nThe user is asking about the ${CHORD_LIBRARY[chordName]?.name || chordName} chord. Explain its shape, how to place fingers, and strumming tips.` : ''),
+        imageMetadata
+      );
+
+      // If AI didn't catch chord but AI response mentions a chord, extract it
+      if (!chordName) {
+        chordName = extractChord(reply);
+      }
+    } catch (err) {
+      console.warn('AIService contextual generation failed, falling back to CoachKnowledgeService:', err);
+
+      if (imageMetadata?.analysisText) {
+        if (imageMetadata.results?.guitarDetected) {
+          reply = `I analyzed your image! I can see you playing a ${imageMetadata.results.guitarStyle || 'guitar'}. ${imageMetadata.results.chordDetected ? `Your chord appears to be ${imageMetadata.results.chordDetected}.` : ''} ${imageMetadata.results.postureMetrics ? `Posture evaluation score: ${imageMetadata.results.postureMetrics.score}/100. Tip: keep your left wrist rounded and avoid tilting backwards.` : 'Good posture detected.'}`;
+        } else {
+          reply = `I inspected your snapshot: "${imageMetadata.analysisText}". To get the best posture and fret evaluation, make sure your guitar and fretting hand are centered in the camera!`;
+        }
+      } else {
+        const userName = user?.displayName || user?.email?.split('@')[0] || 'Guitarist';
+        const userAny = user as any;
+        const knowledge = CoachKnowledgeService.getInteractiveResponse(
+          userText,
+          coachId,
+          userName,
+          {
+            level: userAny?.level || userAny?.stats?.currentLevel?.toString() || 'beginner',
+            streak: userAny?.streak || userAny?.stats?.currentStreak || 0,
+            knownChords: userAny?.progress?.knownChords,
+            weakChords: userAny?.progress?.weakChords
+          }
+        );
+
+        reply = knowledge.reply;
+        if (knowledge.chordToDiagram) {
+          chordName = knowledge.chordToDiagram.toLowerCase();
+        }
+
+        if (knowledge.suggestedAction) {
+          actionsHTML = `
+            <div class="coach-action-suggestion mt-3 pt-2" style="border-top: 1px solid rgba(255,255,255,0.06);">
+              <a href="${knowledge.suggestedAction.route}" class="btn btn-secondary btn-sm inline-flex items-center gap-2 py-1.5 px-3 text-xs" style="border-radius: 4px; border: 1px solid rgba(255,255,255,0.12); text-decoration: none; color: #fff; background: rgba(255,255,255,0.06);">
+                <span>${knowledge.suggestedAction.label}</span>
+                <span style="color: #fbbf24; font-weight: bold;">→</span>
+              </a>
+            </div>
+          `;
+        }
+      }
+
+      // Keep DB synchronized on fallback
+      if (activeConversationId && user) {
+        await ConversationsRepo.addMessage(activeConversationId, user.uid, {
+          id: `msg_${Date.now()}_u`,
+          role: 'user',
+          content: userText,
+          contentType: imageMetadata ? 'image_analysis' : 'text',
+          timestamp: new Date().toISOString(),
+          metadata: imageMetadata ? {
+            imageUrl: imageMetadata.imageUrl,
+            analysisText: imageMetadata.analysisText,
+            results: imageMetadata.results
+          } as any : undefined
+        });
+      }
+    }
+
+    // Build interactive chord diagrams if a chord was identified
+    if (chordName && CHORD_LIBRARY[chordName]) {
       const bookSVG = renderBookNotationSVG(chordName);
       const fingerSVG = renderFingerPlacementSVG(chordName);
       diagramsHTML = `
@@ -691,104 +790,31 @@ function triggerCoachResponse(
       `;
     }
 
-    try {
-      if (!user || !activeConversationId) {
-        throw new Error('User session or active conversation is missing.');
-      }
-
-      reply = await AIService.generateContextualResponse(
-        user.uid,
-        activeConversationId,
-        userText,
-        coach.systemPrompt + (chordName ? `\n\nThe user is asking about the ${CHORD_LIBRARY[chordName]?.name || chordName} chord. Explain its shape, how to place fingers, and strumming tips.` : ''),
-        imageMetadata
-      );
-      
-      // Update local storage diagrams metadata if chord was generated
-      if (chordName && diagramsHTML) {
-        const msgs = await ConversationsRepo.getMessages(activeConversationId);
-        if (msgs.length > 0) {
-          const lastMsg = msgs[msgs.length - 1];
-          lastMsg.metadata = { ...(lastMsg.metadata as any), diagramsHTML };
-          localStorage.setItem(`guitarmind_msgs_${activeConversationId}`, JSON.stringify(msgs));
-        }
-      }
-    } catch (err) {
-      console.error('Contextual AI response generation failed, using mock backup:', err);
-      // Intelligent reactive response matrix based on image analysis, keywords, and coach personality
-      if (imageMetadata?.analysisText) {
-        if (imageMetadata.results?.guitarDetected) {
-          reply = `I analyzed your image! I can see you playing a ${imageMetadata.results.guitarStyle || 'guitar'}. ${imageMetadata.results.chordDetected ? `Your chord appears to be ${imageMetadata.results.chordDetected}.` : ''} ${imageMetadata.results.postureMetrics ? `Posture evaluation score: ${imageMetadata.results.postureMetrics.score}/100. Tip: keep your left wrist rounded and avoid tilting backwards.` : 'Good posture detected.'}`;
-        } else {
-          reply = `I inspected your snapshot: "${imageMetadata.analysisText}". To get the best posture and fret evaluation, make sure your guitar and fretting hand are centered in the camera!`;
-        }
-      } else if (textLower.includes('how am i') || textLower.includes('progress') || textLower.includes('doing')) {
-        if (coachId === 'maya') {
-          reply = "You're doing fantastic! You've logged 3 days of practice this week, and you are getting so close to G-C chord mastery. Keep up the positive vibe! 🌱";
-        } else if (coachId === 'axel') {
-          reply = "You're making total noise, my friend! You logged 3 solid days. Keep hitting those chord transitions, and you'll be shreds-ready in no time! 🎸🤘";
-        } else if (coachId === 'professor_chen') {
-          reply = "Looking at your log, you have successfully completed 3 sessions this week with an average clarity rating of 85%. Your rhythmic precision is developing steadily. Let us continue studying scale positions.";
-        } else {
-          reply = "Your practice discipline is commendable. The hand movements are becoming more deliberate. Focus on keeping your wrist relaxed as we build transitions.";
-        }
-      } else if (chordName) {
-        reply = getChordExplanation(chordName);
-      } else if (textLower.includes('g major') || textLower.includes('chord') || textLower.includes('teach')) {
-        reply = "To play the **G Major chord**, place your 2nd finger (middle) on the 6th string 3rd fret, your 1st finger (index) on the 5th string 2nd fret, and your 3rd finger (ring) on the 1st string 3rd fret. Strum all 6 strings clearly!";
-      } else if (textLower.includes('exercise') || textLower.includes('practice') || textLower.includes('give')) {
-        reply = "Here is a quick transition exercise: Play G Major for 4 beats, then switch to C Major for 4 beats. Set your metronome to 60 BPM and repeat this cycle 10 times. Focus on clean notes!";
-      } else if (textLower.includes('song') || textLower.includes('recommend')) {
-        reply = "I highly recommend trying **'House of the Rising Sun'** (uses Am, C, D, F, E) or **'Knockin' on Heaven's Door'** (uses G, D, Am, C). They are absolute classics and perfect for chord progression building!";
-      } else {
-        // General response fallback
-        if (coachId === 'maya') {
-          reply = "That's a great question! Learning guitar is all about exploring new sounds. Tell me, how do your fingers feel when holding standard open chords?";
-        } else if (coachId === 'axel') {
-          reply = "Oh yeah! That's what I'm talking about! Let's dial in some drive and jam on that riff. What's standing between you and the stage?";
-        } else if (coachId === 'professor_chen') {
-          reply = "I understand. Musically, what you've described is related to fretboard layout. Let's break it down structurally. What part of the fretboard feel most complex?";
-        } else {
-          reply = "Patience is a crucial aspect of technique. Let us focus on slowing down the movement. Pluck each string separately to verify tone clarity.";
-        }
-      }
-
-      // Keep DB synchronized on error fallback
-      if (activeConversationId && user) {
-        await ConversationsRepo.addMessage(activeConversationId, user.uid, {
-          id: `msg_${Date.now()}_u`,
-          role: 'user',
-          content: userText,
-          contentType: imageMetadata ? 'image_analysis' : 'text',
-          timestamp: new Date().toISOString(),
-          metadata: imageMetadata ? {
-            imageUrl: imageMetadata.imageUrl,
-            analysisText: imageMetadata.analysisText,
-            results: imageMetadata.results
-          } as any : undefined
-        });
-        await ConversationsRepo.addMessage(activeConversationId, user.uid, {
-          id: `msg_${Date.now()}_a`,
-          role: 'assistant',
-          content: reply,
-          contentType: 'text',
-          timestamp: new Date().toISOString(),
-          metadata: diagramsHTML ? { diagramsHTML } as any : undefined
-        });
-      }
+    // Save assistant message to DB with metadata
+    if (activeConversationId && user) {
+      await ConversationsRepo.addMessage(activeConversationId, user.uid, {
+        id: `msg_${Date.now()}_a`,
+        role: 'assistant',
+        content: reply,
+        contentType: 'text',
+        timestamp: new Date().toISOString(),
+        metadata: (diagramsHTML || actionsHTML) ? { diagramsHTML, actionsHTML } as any : undefined
+      });
     }
 
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    conversationHistory.push({ sender: 'coach', text: reply, time, diagramsHTML });
+    conversationHistory.push({ sender: 'coach', text: reply, time, diagramsHTML, actionsHTML });
 
     // Append coach bubble to DOM
     const coachRow = document.createElement('div');
     coachRow.className = 'chat-message-row msg-coach-row animate-scale-in';
+    const initials = getCoachInitials(coachId);
     coachRow.innerHTML = `
-      <div class="chat-avatar-circle">${coach.emoji}</div>
+      <div class="chat-avatar-circle flex items-center justify-center font-bold text-xs bg-primary-container text-primary-color" style="width: 32px; height: 32px; border-radius: 50%;">${initials}</div>
       <div class="chat-bubble bubble-coach glass-card">
-        <p class="chat-text">${reply}</p>
+        <div class="chat-text text-sm leading-relaxed" style="color: var(--text-primary);">${formatCoachMessage(reply)}</div>
         ${diagramsHTML}
+        ${actionsHTML}
         <span class="chat-time">${time}</span>
       </div>
     `;
@@ -945,7 +971,7 @@ function extractChord(text: string): string {
   return 'a';
 }
 
-function getChordExplanation(chordKey: string): string {
+export function getChordExplanation(chordKey: string): string {
   const chord = CHORD_LIBRARY[chordKey];
   if (!chord) return "I can help you with chord shapes. Which chord would you like to learn?";
   

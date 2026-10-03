@@ -1,4 +1,4 @@
-FROM llama3.2
+FROM llama3.2:1b
 
 # GuitarMind AI — Fine-tuned Guitar Coaching Model
 # This Modelfile adds guitar-specific knowledge and coaching behavior
