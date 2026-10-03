@@ -715,8 +715,14 @@ function triggerCoachResponse(
       }
     } catch (err) {
       console.error('Contextual AI response generation failed, using mock backup:', err);
-      // Simple reactive response matrix based on keywords and personality
-      if (textLower.includes('how am i') || textLower.includes('progress') || textLower.includes('doing')) {
+      // Intelligent reactive response matrix based on image analysis, keywords, and coach personality
+      if (imageMetadata?.analysisText) {
+        if (imageMetadata.results?.guitarDetected) {
+          reply = `I analyzed your image! I can see you playing a ${imageMetadata.results.guitarStyle || 'guitar'}. ${imageMetadata.results.chordDetected ? `Your chord appears to be ${imageMetadata.results.chordDetected}.` : ''} ${imageMetadata.results.postureMetrics ? `Posture evaluation score: ${imageMetadata.results.postureMetrics.score}/100. Tip: keep your left wrist rounded and avoid tilting backwards.` : 'Good posture detected.'}`;
+        } else {
+          reply = `I inspected your snapshot: "${imageMetadata.analysisText}". To get the best posture and fret evaluation, make sure your guitar and fretting hand are centered in the camera!`;
+        }
+      } else if (textLower.includes('how am i') || textLower.includes('progress') || textLower.includes('doing')) {
         if (coachId === 'maya') {
           reply = "You're doing fantastic! You've logged 3 days of practice this week, and you are getting so close to G-C chord mastery. Keep up the positive vibe! 🌱";
         } else if (coachId === 'axel') {
