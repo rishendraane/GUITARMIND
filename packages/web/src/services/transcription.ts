@@ -19,6 +19,26 @@ const STRING_BASE_FREQS = [
 // Note names for 12 semitones
 const SEMITONE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
+export const STRING_BASE_MIDIS: Record<number, number> = {
+  1: 64, // E4
+  2: 59, // B3
+  3: 55, // G3
+  4: 50, // D3
+  5: 45, // A2
+  6: 40  // E2
+};
+
+export type StringConstraintMode = '1' | '2' | '3' | '4' | '6';
+export type SingleStringTarget = 'auto' | 1 | 2 | 3 | 4 | 5 | 6;
+export type TwoStringsTarget = 'auto' | '5-6' | '4-5' | '3-4' | '1-2';
+
+export interface ArrangementConfig {
+  stringCount: StringConstraintMode;
+  singleStringTarget?: SingleStringTarget;
+  twoStringsTarget?: TwoStringsTarget;
+  includeChords: boolean;
+}
+
 export interface AudioAnalysisSummary {
   durationSeconds: number;
   sampleRate: number;
@@ -88,6 +108,15 @@ export class TranscriptionService {
     const freq = s.freq * Math.pow(2, fret / 12);
     const noteInfo = this.freqToNote(freq);
     return noteInfo ? noteInfo.noteName : `${s.name}+${fret}`;
+  }
+
+  /**
+   * Convert MIDI number to pitch note name (e.g. 64 -> E4, 40 -> E2).
+   */
+  static midiToNoteName(midi: number): string {
+    const noteIndex = ((midi % 12) + 12) % 12;
+    const octave = Math.floor(midi / 12) - 1;
+    return `${SEMITONE_NAMES[noteIndex]}${octave}`;
   }
 
   /**
@@ -489,9 +518,9 @@ Output MUST be valid JSON adhering to:
   }
 
   /**
-   * Convert structured notes array into formatted 6-line ASCII tab.
+   * Convert structured notes array into formatted ASCII tab with single-string and multi-string views.
    */
-  static generateAsciiTab(notes: TranscribedNote[]): string {
+  static generateAsciiTab(notes: TranscribedNote[], allowedStrings?: number[]): string {
     const stringNames = ['e', 'B', 'G', 'D', 'A', 'E'];
     const lines: string[] = stringNames.map(s => `${s}|`);
 
@@ -515,7 +544,200 @@ Output MUST be valid JSON adhering to:
       lines[s] += '|';
     }
 
+    if (allowedStrings && allowedStrings.length === 1) {
+      const sNum = allowedStrings[0];
+      const sName = stringNames[sNum - 1];
+      let soloLine = `${sName} (Solo)|`;
+      notes.forEach((n, idx) => {
+        soloLine += `-${n.fret}-`;
+        if ((idx + 1) % 8 === 0) soloLine += '|';
+      });
+      soloLine += '|';
+
+      return `=== SINGLE STRING SOLO TAB (String ${sNum} - ${sName}) ===\n${soloLine}\n\n=== FULL 6-LINE GUITAR TABLATURE ===\n${lines.join('\n')}`;
+    }
+
+    if (allowedStrings && allowedStrings.length === 2) {
+      const s1 = allowedStrings[0];
+      const s2 = allowedStrings[1];
+      const lines2 = [
+        `${stringNames[s1 - 1]}|`,
+        `${stringNames[s2 - 1]}|`
+      ];
+      notes.forEach((n, idx) => {
+        if (n.string === s1) {
+          lines2[0] += `-${n.fret}-`;
+          lines2[1] += `---`;
+        } else if (n.string === s2) {
+          lines2[0] += `---`;
+          lines2[1] += `-${n.fret}-`;
+        } else {
+          lines2[0] += `---`;
+          lines2[1] += `---`;
+        }
+        if ((idx + 1) % 8 === 0) {
+          lines2[0] += '|';
+          lines2[1] += '|';
+        }
+      });
+      lines2[0] += '|';
+      lines2[1] += '|';
+
+      return `=== 2-STRING CONDENSED TAB (Strings ${s1} & ${s2}: ${stringNames[s1 - 1]} / ${stringNames[s2 - 1]}) ===\n${lines2.join('\n')}\n\n=== FULL 6-LINE GUITAR TABLATURE ===\n${lines.join('\n')}`;
+    }
+
     return lines.join('\n');
+  }
+
+  /**
+   * Determine the specific strings to use based on arrangement settings.
+   */
+  static resolveAllowedStrings(notes: TranscribedNote[], config: ArrangementConfig): number[] {
+    if (config.stringCount === '1') {
+      if (typeof config.singleStringTarget === 'number') {
+        return [config.singleStringTarget];
+      }
+      // Auto: find best single string that minimizes fret range and jumps
+      let bestS = 6;
+      let lowestScore = Infinity;
+      for (let s = 1; s <= 6; s++) {
+        const base = STRING_BASE_MIDIS[s];
+        let score = 0;
+        for (const n of notes) {
+          const origMidi = (STRING_BASE_MIDIS[n.string] || 50) + n.fret;
+          let bestFret = 99;
+          for (const shift of [0, -12, 12, -24, 24]) {
+            const fret = (origMidi + shift) - base;
+            if (fret >= 0 && fret <= 15) {
+              bestFret = Math.min(bestFret, fret);
+            }
+          }
+          score += bestFret;
+        }
+        if (score < lowestScore) {
+          lowestScore = score;
+          bestS = s;
+        }
+      }
+      return [bestS];
+    }
+
+    if (config.stringCount === '2') {
+      if (config.twoStringsTarget === '5-6') return [5, 6];
+      if (config.twoStringsTarget === '4-5') return [4, 5];
+      if (config.twoStringsTarget === '3-4') return [3, 4];
+      if (config.twoStringsTarget === '1-2') return [1, 2];
+      const avgMidi = notes.reduce((sum, n) => sum + (STRING_BASE_MIDIS[n.string] || 50) + n.fret, 0) / (notes.length || 1);
+      return avgMidi < 55 ? [5, 6] : [1, 2];
+    }
+
+    if (config.stringCount === '3') {
+      return [1, 2, 3];
+    }
+
+    if (config.stringCount === '4') {
+      return [1, 2, 3, 4];
+    }
+
+    return [1, 2, 3, 4, 5, 6];
+  }
+
+  /**
+   * Re-maps an existing transcription dynamically to a specific number of strings
+   * (e.g. single-string mode, 2-string mode) with or without chord accompaniment.
+   */
+  static rearrangeTranscription(
+    original: SongTranscriptionResult,
+    config: ArrangementConfig
+  ): SongTranscriptionResult & { allowedStrings: number[] } {
+    const allowedStrings = this.resolveAllowedStrings(original.notes, config);
+    let prevFret = 0;
+
+    const mappedNotes: TranscribedNote[] = original.notes.map((n) => {
+      const origMidi = (STRING_BASE_MIDIS[n.string] || 50) + n.fret;
+      let bestString = allowedStrings[0];
+      let bestFret = 0;
+      let bestMidi = origMidi;
+      let lowestPenalty = Infinity;
+
+      for (const s of allowedStrings) {
+        const base = STRING_BASE_MIDIS[s];
+        for (const shift of [0, -12, 12, -24, 24]) {
+          const candMidi = origMidi + shift;
+          const candFret = candMidi - base;
+          if (candFret >= 0 && candFret <= 17) {
+            const jumpPenalty = Math.abs(candFret - prevFret) * 0.45;
+            const fretPenalty = candFret * 0.4;
+            const shiftPenalty = Math.abs(shift) * 0.25;
+            const penalty = fretPenalty + jumpPenalty + shiftPenalty;
+            if (penalty < lowestPenalty) {
+              lowestPenalty = penalty;
+              bestString = s;
+              bestFret = candFret;
+              bestMidi = candMidi;
+            }
+          }
+        }
+      }
+
+      prevFret = bestFret;
+      const noteName = this.midiToNoteName(bestMidi);
+
+      return {
+        string: bestString,
+        fret: bestFret,
+        noteName,
+        time: n.time,
+        duration: n.duration,
+        chordSymbol: config.includeChords ? n.chordSymbol : undefined,
+        technique: config.includeChords ? n.technique : 'pick'
+      };
+    });
+
+    const newTabStaff = this.generateAsciiTab(mappedNotes, allowedStrings);
+
+    const stringDesc = config.stringCount === '1'
+      ? `Single-String Solo (String ${allowedStrings[0]})`
+      : config.stringCount === '2'
+      ? `Dual-String Arrangement (Strings ${allowedStrings.join(' & ')})`
+      : config.stringCount === '6'
+      ? 'Standard 6-String Studio Arrangement'
+      : `${config.stringCount}-String Arrangement (Strings ${allowedStrings.join(', ')})`;
+
+    const chordDesc = config.includeChords
+      ? 'With Full Chords'
+      : 'Melody Only (No Chords)';
+
+    const steps = [
+      {
+        index: 0,
+        name: config.stringCount === '1' ? 'Single-String Slide Technique' : 'Fretboard Positioning',
+        desc: config.stringCount === '1'
+          ? `All notes are mapped along String ${allowedStrings[0]}. Use slides and smooth horizontal shifting up and down the fretboard.`
+          : `Economy of motion across strings ${allowedStrings.join(' and ')}.`
+      },
+      {
+        index: 1,
+        name: config.includeChords ? 'Chord Progression Rhythm' : 'Pure Single-Note Articulation',
+        desc: config.includeChords
+          ? `Lock in the chord roots while transitioning between notes.`
+          : 'Zero chord interference: focus purely on single-note pick attack, fret buzz prevention, and timing.'
+      },
+      {
+        index: 2,
+        name: 'Synthesizer Playback Sync',
+        desc: `Listen to this ${stringDesc} • ${chordDesc} using the guitar synth below.`
+      }
+    ];
+
+    return {
+      ...original,
+      notes: mappedNotes,
+      chords: config.includeChords ? original.chords : [],
+      tabStaff: newTabStaff,
+      steps,
+      allowedStrings
+    };
   }
 
   /**

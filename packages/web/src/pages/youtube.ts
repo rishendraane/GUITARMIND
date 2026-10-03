@@ -4,9 +4,25 @@ import { RoadmapService } from '../services/roadmap';
 import type { RoadmapTask, SongTranscriptionResult, TranscribedNote } from '@guitarmind/core';
 import { SongsRepo } from '../repositories/songs.repo';
 import { icons } from '../components/icons';
-import { TranscriptionService, type AudioAnalysisSummary } from '../services/transcription';
+import {
+  TranscriptionService,
+  type AudioAnalysisSummary,
+  type ArrangementConfig,
+  type StringConstraintMode,
+  type SingleStringTarget,
+  type TwoStringsTarget
+} from '../services/transcription';
 
+let baseTranscription: SongTranscriptionResult | null = null;
 let activeTranscription: SongTranscriptionResult | null = null;
+let currentAllowedStrings: number[] = [1, 2, 3, 4, 5, 6];
+let currentArrangementConfig: ArrangementConfig = {
+  stringCount: '6',
+  singleStringTarget: 'auto',
+  twoStringsTarget: 'auto',
+  includeChords: true
+};
+
 let currentSourceMode: 'link' | 'upload' = 'upload';
 let uploadedAudioFile: File | null = null;
 let uploadedAudioUrl: string | null = null;
@@ -39,7 +55,7 @@ export const youtubeRoute = {
       `;
 
     return `
-      <div class="w-full min-h-screen flex flex-col items-center animate-fade-in pb-24 overflow-x-hidden" style="background: radial-gradient(circle at 10% 10%, rgba(245, 158, 11, 0.04) 0%, transparent 45%), radial-gradient(circle at 90% 10%, rgba(124, 58, 237, 0.06) 0%, transparent 45%), var(--bg-main);">
+      <div class="w-full min-h-screen flex flex-col items-center animate-fade-in pb-28 overflow-x-hidden" style="background: radial-gradient(circle at 10% 10%, rgba(245, 158, 11, 0.04) 0%, transparent 45%), radial-gradient(circle at 90% 10%, rgba(124, 58, 237, 0.06) 0%, transparent 45%), var(--bg-main);">
         <main class="w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6 min-w-0">
           
           <!-- Header -->
@@ -50,7 +66,7 @@ export const youtubeRoute = {
                 <span class="badge text-xxs font-mono" style="background: rgba(52, 211, 153, 0.15); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.3);">YIN Spectral Engine Active</span>
               </div>
               <h2 class="m-0 text-2xl font-bold">AI Song & Tab Transcriber</h2>
-              <p class="text-xs text-muted-color m-0 mt-1">Upload song audio or paste a link. Our AI extracts exact note-by-note tabs, chords, and animated fretboard fingerings.</p>
+              <p class="text-xs text-muted-color m-0 mt-1">Upload song audio or paste a link. Customize single-string solos, 2-string riffs, or full 6-string arrangements with or without chords.</p>
             </div>
           </header>
 
@@ -74,7 +90,7 @@ export const youtubeRoute = {
 
                 <!-- Upload Mode Container -->
                 <div id="container-upload-mode" class="${currentSourceMode === 'upload' ? '' : 'hidden'}">
-                  <p class="text-xs text-muted-color mb-3">Upload any MP3, WAV, M4A, or OGG recording. High-precision YIN pitch tracker will isolate guitar notes, tempo, and chords.</p>
+                  <p class="text-xs text-muted-color mb-3">Upload any MP3, WAV, M4A, or OGG recording. High-precision YIN pitch tracker isolates fundamental guitar notes, tempo, and chords.</p>
                   <div id="audio-drop-zone" class="border-2 border-dashed border-glass rounded-xl p-6 text-center cursor-pointer hover:border-primary-color transition-all flex flex-col items-center justify-center gap-2" style="background: rgba(255,255,255,0.015);">
                     <div class="w-12 h-12 rounded-full bg-glass border-glass flex items-center justify-center text-primary-color mb-1">
                       ${icons.upload('w-6 h-6')}
@@ -175,9 +191,83 @@ export const youtubeRoute = {
               <span class="badge badge-secondary text-xxs py-1 px-3">Duration: <b id="yt-meta-duration" class="text-white ml-1 font-mono">28.0s</b></span>
             </div>
 
-            <!-- Chords in Progression -->
-            <div>
-              <span class="text-xxs font-bold uppercase tracking-wider text-muted-color block mb-2">Detected Chord Progression</span>
+            <!-- DYNAMIC ARRANGEMENT & STRING CONTROLLER -->
+            <div class="p-4 bg-card-elevated border-glass rounded-xl flex flex-col gap-3.5" style="background: rgba(15, 23, 42, 0.55); border: 1px solid rgba(255, 255, 255, 0.09);">
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                      ${icons.settings('w-3.5 h-3.5 text-primary-color')} String Count & Chord Arrangement
+                    </span>
+                    <span id="active-arrangement-badge" class="badge badge-primary text-xxs font-mono">All 6 Strings • With Chords</span>
+                  </div>
+                  <p class="text-xxs text-muted-color m-0 mt-0.5">Switch instantly between single-string slide solo, 2-string riff, and full 6-string tab with or without chords.</p>
+                </div>
+
+                <!-- Quick Chord Accompaniment Toggle Buttons -->
+                <div class="flex items-center gap-1 bg-glass p-1 rounded-lg border-glass w-fit">
+                  <button type="button" id="btn-toggle-chords-off" class="btn btn-sm text-xxs py-1 px-3 btn-secondary flex items-center gap-1" title="Play pure single-note melody without chord backing">
+                    ${icons.music('w-3 h-3')}
+                    <span>No Chords (Melody Solo)</span>
+                  </button>
+                  <button type="button" id="btn-toggle-chords-on" class="btn btn-sm text-xxs py-1 px-3 btn-primary flex items-center gap-1" title="Include chord progression and harmony accompaniment">
+                    ${icons.sparkles('w-3 h-3')}
+                    <span>With Chords</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- String Count Mode Buttons -->
+              <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-glass">
+                <span class="text-xxs uppercase tracking-wider font-semibold text-muted-color mr-1">Number of Strings:</span>
+                
+                <button type="button" class="btn-string-count btn btn-sm text-xxs py-1 px-3 btn-secondary" data-count="1">
+                  <span>1 String (Single String Solo)</span>
+                </button>
+                
+                <button type="button" class="btn-string-count btn btn-sm text-xxs py-1 px-3 btn-secondary" data-count="2">
+                  <span>2 Strings (Dual String Riff)</span>
+                </button>
+                
+                <button type="button" class="btn-string-count btn btn-sm text-xxs py-1 px-3 btn-secondary" data-count="3">
+                  <span>3 Strings (Triad Box)</span>
+                </button>
+                
+                <button type="button" class="btn-string-count btn btn-sm text-xxs py-1 px-3 btn-secondary" data-count="4">
+                  <span>4 Strings</span>
+                </button>
+                
+                <button type="button" class="btn-string-count btn btn-sm text-xxs py-1 px-3 btn-primary" data-count="6">
+                  <span>All 6 Strings (Standard)</span>
+                </button>
+              </div>
+
+              <!-- Sub-picker for Single String (Target: 1, 2, 3, 4, 5, 6, or auto) -->
+              <div id="single-string-picker" class="hidden flex flex-wrap items-center gap-2 pt-2 border-t border-glass/60 animate-fade-in">
+                <span class="text-xxs uppercase tracking-wider font-semibold text-accent-color mr-1">Select Single String:</span>
+                <button type="button" class="btn-target-single btn btn-sm text-xxs py-0.5 px-2.5 btn-primary" data-string="auto">Auto (Best Fit)</button>
+                <button type="button" class="btn-target-single btn btn-sm text-xxs py-0.5 px-2.5 btn-secondary" data-string="1">String 1 (High E)</button>
+                <button type="button" class="btn-target-single btn btn-sm text-xxs py-0.5 px-2.5 btn-secondary" data-string="2">String 2 (B)</button>
+                <button type="button" class="btn-target-single btn btn-sm text-xxs py-0.5 px-2.5 btn-secondary" data-string="3">String 3 (G)</button>
+                <button type="button" class="btn-target-single btn btn-sm text-xxs py-0.5 px-2.5 btn-secondary" data-string="4">String 4 (D)</button>
+                <button type="button" class="btn-target-single btn btn-sm text-xxs py-0.5 px-2.5 btn-secondary" data-string="5">String 5 (A)</button>
+                <button type="button" class="btn-target-single btn btn-sm text-xxs py-0.5 px-2.5 btn-secondary" data-string="6">String 6 (Low E)</button>
+              </div>
+
+              <!-- Sub-picker for 2 Strings (Target: 5-6, 4-5, 3-4, 1-2, or auto) -->
+              <div id="two-strings-picker" class="hidden flex flex-wrap items-center gap-2 pt-2 border-t border-glass/60 animate-fade-in">
+                <span class="text-xxs uppercase tracking-wider font-semibold text-accent-color mr-1">Select 2-String Pair:</span>
+                <button type="button" class="btn-target-pair btn btn-sm text-xxs py-0.5 px-2.5 btn-primary" data-pair="auto">Auto (Best Fit)</button>
+                <button type="button" class="btn-target-pair btn btn-sm text-xxs py-0.5 px-2.5 btn-secondary" data-pair="5-6">Strings 5 & 6 (Power / Bass)</button>
+                <button type="button" class="btn-target-pair btn btn-sm text-xxs py-0.5 px-2.5 btn-secondary" data-pair="4-5">Strings 4 & 5 (Rhythm Mid)</button>
+                <button type="button" class="btn-target-pair btn btn-sm text-xxs py-0.5 px-2.5 btn-secondary" data-pair="3-4">Strings 3 & 4 (Central)</button>
+                <button type="button" class="btn-target-pair btn btn-sm text-xxs py-0.5 px-2.5 btn-secondary" data-pair="1-2">Strings 1 & 2 (High Lead Solo)</button>
+              </div>
+            </div>
+
+            <!-- Chords in Progression Section -->
+            <div id="yt-chords-section">
+              <span id="yt-chords-title" class="text-xxs font-bold uppercase tracking-wider text-muted-color block mb-2">Detected Chord Progression</span>
               <div id="yt-chords-container" class="flex flex-wrap gap-2">
                 <!-- Populated dynamically -->
               </div>
@@ -278,7 +368,7 @@ export const youtubeRoute = {
                 <span class="text-xs font-bold uppercase tracking-wider text-muted-color flex items-center gap-1.5">
                   ${icons.music('w-3.5 h-3.5')} Interactive Rosewood Fretboard (Click any string or fret to pluck)
                 </span>
-                <span class="text-xxs text-muted-color font-mono">Frets 0 - 15 • Strings 1 (High E) to 6 (Low E)</span>
+                <span id="fretboard-string-status" class="text-xxs text-muted-color font-mono">Frets 0 - 15 • Strings 1 to 6 Active</span>
               </div>
               <div class="fretboard-visualizer-container w-full min-w-0 overflow-x-auto p-4 bg-card-elevated border-glass rounded-xl shadow-inner" style="background: #09090d; border: 1px solid rgba(255,255,255,0.08); scrollbar-width: thin;">
                 <div id="fretboard-canvas-wrapper" class="relative w-full min-w-0" style="min-width: 780px;">
@@ -317,7 +407,7 @@ export const youtubeRoute = {
               </div>
               <div class="w-full min-w-0 overflow-x-auto rounded-xl border border-glass" style="background: #060609; border-color: rgba(52, 211, 153, 0.25); scrollbar-width: thin;">
                 <div class="flex items-center justify-between px-4 py-2 border-b border-glass" style="background: rgba(255,255,255,0.02); min-width: 600px;">
-                  <span class="text-xxs font-mono text-muted-color">GUITAR TABLATURE • STANDARD TUNING (EADGBE)</span>
+                  <span class="text-xxs font-mono text-muted-color">GUITAR TABLATURE • ARRANGEMENT VIEW</span>
                   <span class="text-xxs font-mono text-success">ASCII FORMAT</span>
                 </div>
                 <pre id="ascii-tab-block" class="p-4 m-0 text-xs font-mono w-full text-success" style="white-space: pre !important; word-wrap: normal !important; line-height: 1.6; letter-spacing: 0.08em; font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;"></pre>
@@ -617,7 +707,7 @@ function setupTranscriberLogic(): void {
 Title: ${activeTranscription.title}
 Artist: ${activeTranscription.artist}
 Key: ${activeTranscription.key} | Tempo: ${activeTranscription.tempo} BPM | Tuning: ${activeTranscription.tuning}
-Chords: ${activeTranscription.chords.join(' - ')}
+Arrangement: ${currentArrangementConfig.stringCount}-String Mode | Chords: ${currentArrangementConfig.includeChords ? 'Yes' : 'No'}
 
 ${activeTranscription.tabStaff}
 
@@ -645,7 +735,7 @@ Generated by GuitarMind AI
 
       await SongsRepo.saveSong({
         userId: uid,
-        title: activeTranscription.title,
+        title: `${activeTranscription.title} (${currentArrangementConfig.stringCount}-String)`,
         artist: activeTranscription.artist,
         key: activeTranscription.key,
         tempo: activeTranscription.tempo,
@@ -673,6 +763,9 @@ Generated by GuitarMind AI
     });
   }
 
+  // Arrangement Controller Event Listeners
+  setupArrangementControllerEvents();
+
   // Recent imports click delegation
   const recentCards = document.querySelectorAll('.btn-recent-import');
   recentCards.forEach(card => {
@@ -689,6 +782,158 @@ Generated by GuitarMind AI
       });
     });
   });
+}
+
+function setupArrangementControllerEvents(): void {
+  // 1. String count buttons: 1, 2, 3, 4, 6
+  const countButtons = document.querySelectorAll('.btn-string-count');
+  countButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const count = btn.getAttribute('data-count') as StringConstraintMode;
+      if (count && count !== currentArrangementConfig.stringCount) {
+        currentArrangementConfig.stringCount = count;
+        applyCurrentArrangement();
+      }
+    });
+  });
+
+  // 2. Single string picker buttons
+  const singleButtons = document.querySelectorAll('.btn-target-single');
+  singleButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const sVal = btn.getAttribute('data-string');
+      currentArrangementConfig.singleStringTarget = sVal === 'auto' ? 'auto' : (parseInt(sVal || '1', 10) as SingleStringTarget);
+      applyCurrentArrangement();
+    });
+  });
+
+  // 3. Two string picker buttons
+  const pairButtons = document.querySelectorAll('.btn-target-pair');
+  pairButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const pVal = btn.getAttribute('data-pair') as TwoStringsTarget;
+      currentArrangementConfig.twoStringsTarget = pVal || 'auto';
+      applyCurrentArrangement();
+    });
+  });
+
+  // 4. Chords toggle buttons
+  const btnChordsOff = document.getElementById('btn-toggle-chords-off');
+  const btnChordsOn = document.getElementById('btn-toggle-chords-on');
+
+  if (btnChordsOff) {
+    btnChordsOff.addEventListener('click', () => {
+      if (currentArrangementConfig.includeChords) {
+        currentArrangementConfig.includeChords = false;
+        applyCurrentArrangement();
+      }
+    });
+  }
+
+  if (btnChordsOn) {
+    btnChordsOn.addEventListener('click', () => {
+      if (!currentArrangementConfig.includeChords) {
+        currentArrangementConfig.includeChords = true;
+        applyCurrentArrangement();
+      }
+    });
+  }
+}
+
+function applyCurrentArrangement(): void {
+  if (!baseTranscription) return;
+
+  stopPlayback();
+
+  const arranged = TranscriptionService.rearrangeTranscription(baseTranscription, currentArrangementConfig);
+  activeTranscription = arranged;
+  currentAllowedStrings = arranged.allowedStrings;
+
+  renderTranscriptionOutput(arranged, arranged.allowedStrings);
+  updateArrangementUiControls(arranged.allowedStrings);
+}
+
+function updateArrangementUiControls(allowedStrings: number[]): void {
+  const stringNames = ['', 'High E', 'B', 'G', 'D', 'A', 'Low E'];
+
+  // 1. Badge text
+  const badge = document.getElementById('active-arrangement-badge');
+  if (badge) {
+    const stringText = currentArrangementConfig.stringCount === '1'
+      ? `1 String (${stringNames[allowedStrings[0]] || 'S' + allowedStrings[0]})`
+      : currentArrangementConfig.stringCount === '2'
+      ? `2 Strings (${allowedStrings.map(s => stringNames[s] || 'S' + s).join(' & ')})`
+      : currentArrangementConfig.stringCount === '6'
+      ? 'All 6 Strings (Standard)'
+      : `${currentArrangementConfig.stringCount} Strings`;
+
+    const chordText = currentArrangementConfig.includeChords ? 'With Chords' : 'No Chords (Melody Solo)';
+    badge.textContent = `${stringText} • ${chordText}`;
+  }
+
+  // 2. String count buttons styling
+  const countButtons = document.querySelectorAll('.btn-string-count');
+  countButtons.forEach(btn => {
+    const count = btn.getAttribute('data-count');
+    if (count === currentArrangementConfig.stringCount) {
+      btn.className = 'btn-string-count btn btn-sm text-xxs py-1 px-3 btn-primary';
+    } else {
+      btn.className = 'btn-string-count btn btn-sm text-xxs py-1 px-3 btn-secondary';
+    }
+  });
+
+  // 3. Single string picker visibility
+  const singlePicker = document.getElementById('single-string-picker');
+  if (singlePicker) {
+    if (currentArrangementConfig.stringCount === '1') {
+      singlePicker.classList.remove('hidden');
+      const singleButtons = singlePicker.querySelectorAll('.btn-target-single');
+      singleButtons.forEach(btn => {
+        const val = btn.getAttribute('data-string');
+        const currentTarget = String(currentArrangementConfig.singleStringTarget || 'auto');
+        if (val === currentTarget) {
+          btn.className = 'btn-target-single btn btn-sm text-xxs py-0.5 px-2.5 btn-primary';
+        } else {
+          btn.className = 'btn-target-single btn btn-sm text-xxs py-0.5 px-2.5 btn-secondary';
+        }
+      });
+    } else {
+      singlePicker.classList.add('hidden');
+    }
+  }
+
+  // 4. Two strings picker visibility
+  const twoPicker = document.getElementById('two-strings-picker');
+  if (twoPicker) {
+    if (currentArrangementConfig.stringCount === '2') {
+      twoPicker.classList.remove('hidden');
+      const pairButtons = twoPicker.querySelectorAll('.btn-target-pair');
+      pairButtons.forEach(btn => {
+        const val = btn.getAttribute('data-pair');
+        const currentPair = currentArrangementConfig.twoStringsTarget || 'auto';
+        if (val === currentPair) {
+          btn.className = 'btn-target-pair btn btn-sm text-xxs py-0.5 px-2.5 btn-primary';
+        } else {
+          btn.className = 'btn-target-pair btn btn-sm text-xxs py-0.5 px-2.5 btn-secondary';
+        }
+      });
+    } else {
+      twoPicker.classList.add('hidden');
+    }
+  }
+
+  // 5. Chords buttons styling
+  const btnChordsOff = document.getElementById('btn-toggle-chords-off');
+  const btnChordsOn = document.getElementById('btn-toggle-chords-on');
+  if (btnChordsOff && btnChordsOn) {
+    if (currentArrangementConfig.includeChords) {
+      btnChordsOn.className = 'btn btn-sm text-xxs py-1 px-3 btn-primary flex items-center gap-1';
+      btnChordsOff.className = 'btn btn-sm text-xxs py-1 px-3 btn-secondary flex items-center gap-1';
+    } else {
+      btnChordsOff.className = 'btn btn-sm text-xxs py-1 px-3 btn-primary flex items-center gap-1';
+      btnChordsOn.className = 'btn btn-sm text-xxs py-1 px-3 btn-secondary flex items-center gap-1';
+    }
+  }
 }
 
 async function runTranscription(params: {
@@ -735,8 +980,8 @@ async function runTranscription(params: {
       artistOverride: detectedArtist
     });
 
-    activeTranscription = result;
-    renderTranscriptionOutput(result);
+    baseTranscription = result;
+    applyCurrentArrangement();
 
     // Also persist log into PocketBase
     const user = appStore.getState().currentUser;
@@ -761,7 +1006,7 @@ async function runTranscription(params: {
   }
 }
 
-function renderTranscriptionOutput(res: SongTranscriptionResult): void {
+function renderTranscriptionOutput(res: SongTranscriptionResult, allowedStrings?: number[]): void {
   // 1. Text metadata
   const title = document.getElementById('yt-lesson-title');
   const artist = document.getElementById('yt-artist-subtitle');
@@ -775,6 +1020,7 @@ function renderTranscriptionOutput(res: SongTranscriptionResult): void {
   const asciiTabBlock = document.getElementById('ascii-tab-block');
   const stepsCont = document.getElementById('yt-steps-container');
   const noteCountBadge = document.getElementById('note-count-badge');
+  const fretboardStatus = document.getElementById('fretboard-string-status');
 
   if (title) title.textContent = res.title;
   if (artist) artist.textContent = `${res.artist} • ${res.tuning}`;
@@ -787,13 +1033,36 @@ function renderTranscriptionOutput(res: SongTranscriptionResult): void {
   if (asciiTabBlock) asciiTabBlock.textContent = res.tabStaff;
   if (noteCountBadge) noteCountBadge.textContent = `${res.notes.length} Exact Notes`;
 
-  // 2. Chords Pills
+  const stringNames = ['', 'High E', 'B', 'G', 'D', 'A', 'Low E'];
+  if (fretboardStatus) {
+    if (allowedStrings && allowedStrings.length === 1) {
+      fretboardStatus.textContent = `Frets 0 - 15 • Exclusively String ${allowedStrings[0]} (${stringNames[allowedStrings[0]]}) Active`;
+    } else if (allowedStrings && allowedStrings.length === 2) {
+      fretboardStatus.textContent = `Frets 0 - 15 • Strings ${allowedStrings.map(s => `${s} [${stringNames[s]}]`).join(' & ')} Active`;
+    } else {
+      fretboardStatus.textContent = 'Frets 0 - 15 • All 6 Strings Active';
+    }
+  }
+
+  // 2. Chords Pills (or Melody Solo Notice if chords disabled)
   if (chordsCont) {
-    chordsCont.innerHTML = res.chords.map(c => `
-      <span class="badge badge-success px-3 py-1 text-xs font-bold font-mono" style="background: rgba(52, 211, 153, 0.15); color: rgb(52, 211, 153); border: 1px solid rgba(52, 211, 153, 0.3);">
-        ${c}
-      </span>
-    `).join('');
+    if (!currentArrangementConfig.includeChords) {
+      chordsCont.innerHTML = `
+        <div class="flex items-center gap-2 p-2 bg-card-elevated border-glass rounded-lg w-full">
+          <span class="text-primary-color">${icons.music('w-4 h-4')}</span>
+          <span class="text-xs font-semibold text-white">Melody Solo Mode Active</span>
+          <span class="text-xxs text-muted-color">• Chord accompaniment disabled for pure single-note practice.</span>
+        </div>
+      `;
+    } else if (res.chords.length > 0) {
+      chordsCont.innerHTML = res.chords.map(c => `
+        <span class="badge badge-success px-3 py-1 text-xs font-bold font-mono" style="background: rgba(52, 211, 153, 0.15); color: rgb(52, 211, 153); border: 1px solid rgba(52, 211, 153, 0.3);">
+          ${c}
+        </span>
+      `).join('');
+    } else {
+      chordsCont.innerHTML = `<span class="text-xxs text-muted-color">No chord progression found.</span>`;
+    }
   }
 
   // 3. Recommended Steps
@@ -811,14 +1080,14 @@ function renderTranscriptionOutput(res: SongTranscriptionResult): void {
     `).join('');
   }
 
-  // 4. Draw Initial Fretboard SVG
-  renderInteractiveFretboard(null);
+  // 4. Draw Initial Fretboard SVG with string dimming / highlighting
+  renderInteractiveFretboard(null, allowedStrings);
 
   // 5. Render Note Strip Chips
   renderNoteSequenceStrip(res.notes);
 }
 
-function renderInteractiveFretboard(activeNote: TranscribedNote | null): void {
+function renderInteractiveFretboard(activeNote: TranscribedNote | null, allowedStrings?: number[]): void {
   const container = document.getElementById('fretboard-canvas-wrapper');
   if (!container) return;
 
@@ -836,7 +1105,6 @@ function renderInteractiveFretboard(activeNote: TranscribedNote | null): void {
   let fretLines = '';
   for (let f = 1; f <= totalFrets; f++) {
     const x = nutX + f * fretWidth;
-    // Fret wire with metallic shadow and highlight
     fretLines += `
       <line x1="${x - 1}" y1="12" x2="${x - 1}" y2="${height - 18}" stroke="#0f172a" stroke-width="1" />
       <line x1="${x}" y1="12" x2="${x}" y2="${height - 18}" stroke="${f === 12 ? '#f1f5f9' : '#cbd5e1'}" stroke-width="${f === 12 ? 2.5 : 1.8}" />
@@ -858,7 +1126,6 @@ function renderInteractiveFretboard(activeNote: TranscribedNote | null): void {
     }
   });
 
-  // String gauges and wound looks
   const stringColors = ['#f1f5f9', '#e2e8f0', '#cbd5e1', '#94a3b8', '#d97706', '#b45309'];
   const stringWidths = [1.2, 1.6, 2.2, 2.8, 3.4, 4.0];
 
@@ -867,15 +1134,21 @@ function renderInteractiveFretboard(activeNote: TranscribedNote | null): void {
 
   for (let s = 1; s <= 6; s++) {
     const y = 18 + (s - 1) * 19;
+    const isAllowed = !allowedStrings || allowedStrings.includes(s);
+    const isSingleOrDual = allowedStrings && allowedStrings.length <= 2;
     const thickness = stringWidths[s - 1];
-    const color = stringColors[s - 1];
+    const color = isAllowed ? (isSingleOrDual ? '#fbbf24' : stringColors[s - 1]) : '#334155';
+    const opacity = isAllowed ? 1.0 : 0.18;
 
     // String shadow
-    stringLines += `<line x1="${nutX}" y1="${y + 1}" x2="${width - 15}" y2="${y + 1}" stroke="#000000" stroke-width="${thickness}" opacity="0.5" />`;
+    stringLines += `<line x1="${nutX}" y1="${y + 1}" x2="${width - 15}" y2="${y + 1}" stroke="#000000" stroke-width="${thickness}" opacity="${opacity * 0.5}" />`;
     // String wire
-    stringLines += `<line x1="${nutX}" y1="${y}" x2="${width - 15}" y2="${y}" stroke="${color}" stroke-width="${thickness}" />`;
+    stringLines += `<line x1="${nutX}" y1="${y}" x2="${width - 15}" y2="${y}" stroke="${color}" stroke-width="${isAllowed && isSingleOrDual ? thickness + 1.2 : thickness}" opacity="${opacity}" />`;
+    
     // String label at headstock side
-    stringLines += `<text x="28" y="${y + 3.5}" fill="rgba(255,255,255,0.85)" font-size="10" font-weight="bold" text-anchor="middle" font-family="monospace">${stringNames[s - 1]}</text>`;
+    const soloTag = isAllowed && allowedStrings && allowedStrings.length === 1 ? ' ★' : '';
+    const labelColor = isAllowed ? (isSingleOrDual ? '#fbbf24' : 'rgba(255,255,255,0.85)') : 'rgba(255,255,255,0.2)';
+    stringLines += `<text x="28" y="${y + 3.5}" fill="${labelColor}" font-size="10" font-weight="bold" text-anchor="middle" font-family="monospace">${stringNames[s - 1]}${soloTag}</text>`;
 
     // Clickable hit areas for each fret
     for (let f = 0; f <= totalFrets; f++) {
@@ -968,7 +1241,7 @@ function renderInteractiveFretboard(activeNote: TranscribedNote | null): void {
         noteName: noteName,
         time: 0,
         duration: 0.5
-      });
+      }, allowedStrings);
     });
   });
 }
@@ -1010,7 +1283,7 @@ function highlightActiveNote(note: TranscribedNote, index: number): void {
   }
 
   // Highlight fretboard
-  renderInteractiveFretboard(note);
+  renderInteractiveFretboard(note, currentAllowedStrings);
 
   // Highlight note chip in strip
   const chips = document.querySelectorAll('.btn-note-chip');
@@ -1080,7 +1353,7 @@ function stopPlayback(): void {
     statusBadge.className = 'badge badge-success text-xxs py-0 px-1.5';
   }
   if (display) display.textContent = 'Click Play to synthesize notes';
-  renderInteractiveFretboard(null);
+  renderInteractiveFretboard(null, currentAllowedStrings);
 
   const chips = document.querySelectorAll('.btn-note-chip');
   chips.forEach(c => {
@@ -1110,11 +1383,12 @@ async function addTranscriptionToRoadmap(): Promise<void> {
   const activeStage = stagesObj.find(s => s.status === 'active') || stagesObj[0]!;
   
   const newTaskId = `task_tab_${Date.now()}`;
+  const chordText = currentArrangementConfig.includeChords ? `Chords: ${activeTranscription.chords.join(' -> ')}` : 'Melody Solo Only';
   const newTask: RoadmapTask = {
     id: newTaskId,
     stageId: activeStage.id,
-    title: activeTranscription.title,
-    description: `Exact Note Tab Drill: ${activeTranscription.chords.join(' -> ')} at ${activeTranscription.tempo} BPM. Focus on string fretting clarity.`,
+    title: `${activeTranscription.title} (${currentArrangementConfig.stringCount}-String)`,
+    description: `Exact Note Tab Drill (${currentArrangementConfig.stringCount}-String Mode): ${chordText} at ${activeTranscription.tempo} BPM. Focus on string fretting clarity.`,
     type: 'exercise',
     status: 'pending',
     scheduledDate: new Date().toISOString(),
