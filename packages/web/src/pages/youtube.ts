@@ -39,11 +39,11 @@ export const youtubeRoute = {
       `;
 
     return `
-      <div class="practice-page-container animate-fade-in mb-16">
-        <main class="practice-main max-w-6xl mx-auto">
+      <div class="w-full min-h-screen flex flex-col items-center animate-fade-in pb-24 overflow-x-hidden" style="background: radial-gradient(circle at 10% 10%, rgba(245, 158, 11, 0.04) 0%, transparent 45%), radial-gradient(circle at 90% 10%, rgba(124, 58, 237, 0.06) 0%, transparent 45%), var(--bg-main);">
+        <main class="w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6 min-w-0">
           
           <!-- Header -->
-          <header class="flex justify-between items-center mb-6">
+          <header class="flex justify-between items-center mb-2">
             <div>
               <div class="flex items-center gap-2 mb-1">
                 <span class="badge badge-primary text-xxs uppercase tracking-wider font-semibold">AI Musical Perception v2</span>
@@ -55,11 +55,11 @@ export const youtubeRoute = {
           </header>
 
           <!-- Top Input & Recents Row (2 columns: 65% / 35%) -->
-          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full min-w-0">
             
             <!-- Left 2 Columns: Source Input Selector -->
-            <div class="lg:col-span-2 flex flex-col gap-4">
-              <div class="glass-card">
+            <div class="lg:col-span-2 flex flex-col gap-4 w-full min-w-0">
+              <div class="glass-card w-full min-w-0">
                 <!-- Mode Switcher Tabs -->
                 <div class="flex gap-2 p-1 bg-card-elevated border-glass rounded-lg mb-4 w-fit">
                   <button type="button" id="tab-mode-upload" class="btn btn-sm ${currentSourceMode === 'upload' ? 'btn-primary' : 'btn-secondary'} flex items-center gap-1.5 text-xs">
@@ -125,7 +125,7 @@ export const youtubeRoute = {
             </div>
 
             <!-- Right 1 Column: Recent Transcriptions -->
-            <div class="lg:col-span-1 glass-card flex flex-col gap-3">
+            <div class="lg:col-span-1 glass-card flex flex-col gap-3 w-full min-w-0">
               <div class="flex items-center justify-between">
                 <h4 class="m-0 text-sm font-bold">Recent Library</h4>
                 <span class="badge badge-info text-xxs font-mono">${recentImports.length} Saved</span>
@@ -139,7 +139,7 @@ export const youtubeRoute = {
           </div>
 
           <!-- FULL-WIDTH OUTPUT NOTE & TAB STUDIO DECK (Initially hidden, revealed on transcription) -->
-          <div id="youtube-output-card" class="glass-card hidden flex flex-col gap-6 animate-scale-in w-full mb-8">
+          <div id="youtube-output-card" class="glass-card hidden flex flex-col gap-6 animate-scale-in w-full min-w-0 max-w-full overflow-hidden mb-8">
             
             <!-- Transcription Header & Quick Actions -->
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-glass pb-4">
@@ -273,33 +273,35 @@ export const youtubeRoute = {
             </div>
 
             <!-- INTERACTIVE REALISTIC GUITAR FRETBOARD -->
-            <div class="flex flex-col gap-2">
+            <div class="flex flex-col gap-2 w-full min-w-0 overflow-hidden">
               <div class="flex items-center justify-between">
                 <span class="text-xs font-bold uppercase tracking-wider text-muted-color flex items-center gap-1.5">
                   ${icons.music('w-3.5 h-3.5')} Interactive Rosewood Fretboard (Click any string or fret to pluck)
                 </span>
                 <span class="text-xxs text-muted-color font-mono">Frets 0 - 15 • Strings 1 (High E) to 6 (Low E)</span>
               </div>
-              <div class="fretboard-visualizer-container overflow-x-auto p-4 bg-card-elevated border-glass rounded-xl shadow-inner" style="background: #09090d; border: 1px solid rgba(255,255,255,0.08);">
-                <div id="fretboard-canvas-wrapper" class="relative w-full" style="min-width: 780px;">
+              <div class="fretboard-visualizer-container w-full min-w-0 overflow-x-auto p-4 bg-card-elevated border-glass rounded-xl shadow-inner" style="background: #09090d; border: 1px solid rgba(255,255,255,0.08); scrollbar-width: thin;">
+                <div id="fretboard-canvas-wrapper" class="relative w-full min-w-0" style="min-width: 780px;">
                   <!-- Dynamic SVG Fretboard drawn here -->
                 </div>
               </div>
             </div>
 
             <!-- NOTE-BY-NOTE SEQUENCE CARDS -->
-            <div class="flex flex-col gap-2">
+            <div class="flex flex-col gap-2 w-full min-w-0 overflow-hidden">
               <div class="flex items-center justify-between">
                 <span class="text-xs font-bold uppercase tracking-wider text-muted-color">Exact Note Sequence (Click card to play note)</span>
                 <span id="note-count-badge" class="badge badge-primary text-xxs font-mono">32 Notes</span>
               </div>
-              <div id="note-sequence-strip" class="flex gap-2.5 overflow-x-auto pb-3 pt-1" style="scrollbar-width: thin;">
-                <!-- Note chips rendered here -->
+              <div class="w-full min-w-0 overflow-x-auto pb-3 pt-1 rounded-xl" style="scrollbar-width: thin; -webkit-overflow-scrolling: touch;">
+                <div id="note-sequence-strip" class="flex gap-2.5 w-max">
+                  <!-- Note chips rendered here -->
+                </div>
               </div>
             </div>
 
             <!-- ASCII TABLATURE STAFF (PRE-FORMATTED, NON-WRAPPING) -->
-            <div class="flex flex-col gap-2">
+            <div class="flex flex-col gap-2 w-full min-w-0 overflow-hidden">
               <div class="flex items-center justify-between">
                 <span class="text-xs font-bold uppercase tracking-wider text-muted-color">Standard Tablature (ASCII Tab)</span>
                 <div class="flex items-center gap-2">
@@ -313,12 +315,12 @@ export const youtubeRoute = {
                   </button>
                 </div>
               </div>
-              <div class="rounded-xl overflow-hidden border border-glass" style="background: #060609; border-color: rgba(52, 211, 153, 0.25);">
-                <div class="flex items-center justify-between px-4 py-2 border-b border-glass" style="background: rgba(255,255,255,0.02);">
+              <div class="w-full min-w-0 overflow-x-auto rounded-xl border border-glass" style="background: #060609; border-color: rgba(52, 211, 153, 0.25); scrollbar-width: thin;">
+                <div class="flex items-center justify-between px-4 py-2 border-b border-glass" style="background: rgba(255,255,255,0.02); min-width: 600px;">
                   <span class="text-xxs font-mono text-muted-color">GUITAR TABLATURE • STANDARD TUNING (EADGBE)</span>
                   <span class="text-xxs font-mono text-success">ASCII FORMAT</span>
                 </div>
-                <pre id="ascii-tab-block" class="p-4 m-0 text-xs font-mono overflow-x-auto text-success" style="white-space: pre !important; word-wrap: normal !important; line-height: 1.6; letter-spacing: 0.08em; font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;"></pre>
+                <pre id="ascii-tab-block" class="p-4 m-0 text-xs font-mono w-full text-success" style="white-space: pre !important; word-wrap: normal !important; line-height: 1.6; letter-spacing: 0.08em; font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;"></pre>
               </div>
             </div>
 
