@@ -360,7 +360,15 @@ export class TranscriptionService {
 
     // 1. Try local server-assisted transcription endpoint first if a file is provided
     if (params.file) {
-      for (const endpoint of ['http://127.0.0.1:5000/api/transcribe', 'http://127.0.0.1:5000/api/transcribe-audio', 'http://localhost:5000/api/transcribe', 'http://localhost:5000/api/transcribe-audio']) {
+      const host = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : '127.0.0.1';
+      for (const endpoint of [
+        `http://${host}:5000/api/transcribe`,
+        `http://${host}:5000/api/transcribe-audio`,
+        'http://127.0.0.1:5000/api/transcribe',
+        'http://127.0.0.1:5000/api/transcribe-audio',
+        'http://localhost:5000/api/transcribe',
+        'http://localhost:5000/api/transcribe-audio'
+      ]) {
         try {
           const formData = new FormData();
           formData.append('audio', params.file);

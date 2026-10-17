@@ -8,7 +8,12 @@ import type { AITextRequest, AITextResponse, AIStructuredRequest } from '@guitar
  */
 export class OllamaProvider implements AIProvider {
   name = 'groq' as const; // reuse 'groq' slot so existing code works
-  private baseUrl = 'http://localhost:11434';
+  private get baseUrl(): string {
+    if (typeof window !== 'undefined' && window.location.hostname) {
+      return `http://${window.location.hostname}:11434`;
+    }
+    return 'http://localhost:11434';
+  }
 
   /** Order of models to try, best quality first */
   private modelPriority = [

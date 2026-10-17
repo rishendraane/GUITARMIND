@@ -12,7 +12,7 @@
  *   DELETE /api/collections/{name}/records/{id}     — delete
  */
 
-const PB_BASE_URL = import.meta.env.VITE_PB_URL || 'http://localhost:8090';
+const PB_BASE_URL = import.meta.env.VITE_PB_URL || (typeof window !== 'undefined' && window.location.hostname ? `http://${window.location.hostname}:8090` : 'http://localhost:8090');
 
 export interface PBRecord {
   id: string;

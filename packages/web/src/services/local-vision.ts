@@ -21,7 +21,11 @@ export interface LocalVisionResult {
 }
 
 export class LocalVisionService {
-  private static SERVER_URL = 'http://127.0.0.1:5000';
+  private static get SERVER_URL(): string {
+    return typeof window !== 'undefined' && window.location.hostname
+      ? `http://${window.location.hostname}:5000`
+      : 'http://127.0.0.1:5000';
+  }
 
   /**
    * Check if the local vision server is running and accessible.

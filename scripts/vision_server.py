@@ -496,4 +496,4 @@ if __name__ == "__main__":
     print("[*] Starting GuitarMind AI Local Vision & Audio Perception Server on port 5000...")
     print("[*] OpenCV Status: " + ("AVAILABLE" if cv2 is not None else "NOT AVAILABLE"))
     print("[*] Miniaudio Status: " + ("AVAILABLE" if miniaudio is not None else "NOT AVAILABLE"))
-    app.run(host="127.0.0.1", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=False)
