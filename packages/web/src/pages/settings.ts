@@ -190,9 +190,10 @@ export const settingsRoute = {
             </section>
 
             <!-- System Info -->
-            <section class="glass-card text-center py-4 bg-glass border-none">
-              <p class="text-xs text-muted-color m-0">GuitarMind AI v1.0.0 (Production-Ready)</p>
-              <p class="text-xs text-disabled mt-1">Built with dedication by DeepMind Advanced Agentic Coding</p>
+            <section class="glass-card text-center py-5 bg-glass border-glass flex flex-col items-center justify-center">
+              <img src="/logo.png" alt="GuitarMind Logo" class="w-16 h-16 rounded-2xl shadow-lg border border-glass mb-3" style="filter: drop-shadow(0 0 15px rgba(139, 92, 246, 0.3));" />
+              <p class="text-xs font-semibold text-white m-0">GuitarMind AI v1.0.0</p>
+              <p class="text-xxs text-muted-color mt-1">AI-Powered Intelligent Guitar Mentor</p>
             </section>
 
             <!-- Sign Out Button -->

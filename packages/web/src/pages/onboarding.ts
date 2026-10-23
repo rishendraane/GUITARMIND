@@ -68,7 +68,13 @@ function renderStep(step: number, state: ReturnType<typeof onboardingStore.getSt
     case 0:
       return `
         <div class="step-fade-in">
-          <h2 class="mb-2">Welcome to GuitarMind AI!</h2>
+          <div class="flex items-center gap-3 mb-3">
+            <img src="/logo.png" alt="GuitarMind" class="w-12 h-12 rounded-xl border border-glass shadow-lg" style="filter: drop-shadow(0 0 15px rgba(139, 92, 246, 0.35));" />
+            <div>
+              <h2 class="m-0 leading-tight">Welcome to GuitarMind AI!</h2>
+              <span class="text-xxs text-primary-color font-semibold uppercase tracking-wider">Smart Guitar Learning</span>
+            </div>
+          </div>
           <p class="text-muted-color mb-6">Let's get to know you first. Tell us a bit about yourself.</p>
           <div class="flex flex-col gap-4">
             <div class="input-group">

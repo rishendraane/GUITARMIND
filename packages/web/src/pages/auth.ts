@@ -18,35 +18,8 @@ export const authRoute = {
 
         <div class="auth-card-wrapper">
           <div class="auth-logo-section">
-            <div class="guitar-icon-animation">
-              <svg viewBox="0 0 100 100" class="guitar-svg">
-                <!-- Body -->
-                <path d="M 40,70 C 25,60 25,45 35,35 C 45,25 55,25 65,35 C 75,45 75,60 60,70 C 50,75 50,75 40,70 Z" fill="url(#guitarBodyGrad)" />
-                <!-- Hole -->
-                <circle cx="50" cy="50" r="10" fill="#0a0a0f" stroke="#fbbf24" stroke-width="2" />
-                <!-- Neck -->
-                <rect x="47" y="5" width="6" height="30" fill="#8b5cf6" />
-                <!-- Frets -->
-                <line x1="47" y1="12" x2="53" y2="12" stroke="#ffffff" stroke-width="1.5" />
-                <line x1="47" y1="20" x2="53" y2="20" stroke="#ffffff" stroke-width="1.5" />
-                <line x1="47" y1="28" x2="53" y2="28" stroke="#ffffff" stroke-width="1.5" />
-                <!-- Head -->
-                <polygon points="45,-2 55,-2 57,6 43,6" fill="#7c3aed" />
-                <!-- Strings -->
-                <line x1="48" y1="2" x2="48" y2="60" stroke="rgba(255,255,255,0.7)" stroke-width="0.8" />
-                <line x1="49" y1="2" x2="49" y2="60" stroke="rgba(255,255,255,0.7)" stroke-width="0.8" />
-                <line x1="50" y1="2" x2="50" y2="60" stroke="rgba(255,255,255,0.7)" stroke-width="0.8" />
-                <line x1="51" y1="2" x2="51" y2="60" stroke="rgba(255,255,255,0.7)" stroke-width="0.8" />
-                <line x1="52" y1="2" x2="52" y2="60" stroke="rgba(255,255,255,0.7)" stroke-width="0.8" />
-                
-                <defs>
-                  <linearGradient id="guitarBodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stop-color="#7c3aed" />
-                    <stop offset="50%" stop-color="#db2777" />
-                    <stop offset="100%" stop-color="#f59e0b" />
-                  </linearGradient>
-                </defs>
-              </svg>
+            <div class="guitar-icon-animation flex justify-center mb-3">
+              <img src="/logo.png" alt="GuitarMind Logo" class="w-24 h-24 rounded-2xl shadow-2xl border border-glass" style="filter: drop-shadow(0 0 25px rgba(139, 92, 246, 0.45));" />
             </div>
             <h1 class="app-title">GuitarMind AI</h1>
             <p class="app-subtitle">Your AI Guitar Teacher, Available 24/7</p>

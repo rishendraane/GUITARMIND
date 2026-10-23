@@ -262,6 +262,15 @@ export const dashboardRoute = {
         <!-- Main Scrollable Content -->
         <main class="dashboard-main">
           
+          <!-- Brand Bar -->
+          <div class="flex items-center justify-between mb-4 pb-2 border-b border-glass">
+            <div class="flex items-center gap-2">
+              <img src="/logo.png" alt="GuitarMind" class="w-7 h-7 rounded-lg shadow-sm border border-glass" />
+              <span class="font-bold text-xs tracking-wider text-white">GUITARMIND <span class="text-primary-color text-xxs font-mono uppercase bg-primary-glow px-1.5 py-0.5 rounded border border-glass">AI</span></span>
+            </div>
+            <span class="badge text-xxs font-mono" style="background: rgba(139, 92, 246, 0.15); color: #c4b5fd;">ONLINE</span>
+          </div>
+
           <!-- Header section -->
           <header class="dashboard-header flex justify-between items-center mb-6">
             <div class="flex items-center gap-3">
